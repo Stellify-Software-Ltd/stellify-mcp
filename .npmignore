@@ -1,0 +1,30 @@
+# Source files (not needed in published package)
+src/
+tsconfig.json
+
+# Tests and dev files
+test-api.js
+*.test.ts
+*.spec.ts
+
+# Development
+.env
+.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Logs
+*.log
+npm-debug.log*
