@@ -1,6 +1,6 @@
 {
   "name": "@stellisoft/stellify-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for Stellify - AI-native code generation platform",
   "main": "dist/index.js",
   "type": "module",
@@ -17,10 +17,20 @@
     "stellify",
     "ai",
     "code-generation",
-    "laravel"
+    "laravel",
+    "claude",
+    "anthropic"
   ],
-  "author": "Stellisoft",
+  "author": "Stellisoft <stellifysoftware@gmail.com> (https://stellisoft.com)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Stellify-Software-Ltd/stellify-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Stellify-Software-Ltd/stellify-mcp/issues"
+  },
+  "homepage": "https://github.com/Stellify-Software-Ltd/stellify-mcp#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
     "axios": "^1.7.9",
