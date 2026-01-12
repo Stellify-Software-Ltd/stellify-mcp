@@ -120,27 +120,27 @@ export class StellifyClient {
   }
 
   async createElement(params: CreateElementParams) {
-    const response = await this.client.post('/v2/element', params);
+    const response = await this.client.post('/element', params);
     return response.data;
   }
 
   async updateElement(uuid: string, data: any) {
-    const response = await this.client.put(`/v2/element/${uuid}`, data);
+    const response = await this.client.put(`/element/${uuid}`, data);
     return response.data;
   }
 
   async getElement(uuid: string) {
-    const response = await this.client.get(`/v2/element/${uuid}`);
+    const response = await this.client.get(`/element/${uuid}`);
     return response.data;
   }
 
   async getElementTree(uuid: string) {
-    const response = await this.client.get(`/v2/element/${uuid}/tree`);
+    const response = await this.client.get(`/element/${uuid}/tree`);
     return response.data;
   }
 
   async deleteElement(uuid: string) {
-    const response = await this.client.delete(`/v2/element/${uuid}`);
+    const response = await this.client.delete(`/element/${uuid}`);
     return response.data;
   }
 
@@ -150,7 +150,17 @@ export class StellifyClient {
     include_metadata?: boolean;
     per_page?: number;
   }) {
-    const response = await this.client.get('/v2/element/search', { params });
+    const response = await this.client.get('/element/search', { params });
+    return response.data;
+  }
+
+  async htmlToElements(params: {
+    elements: string;
+    page?: string;
+    selection?: string;
+    test?: boolean;
+  }) {
+    const response = await this.client.post('/html/elements', params);
     return response.data;
   }
 }

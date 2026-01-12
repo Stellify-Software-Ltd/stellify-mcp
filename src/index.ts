@@ -346,6 +346,49 @@ Note: To reorder elements, use update_element to modify the parent element's 'da
       },
     },
   },
+  {
+    name: 'html_to_elements',
+    description: `Convert HTML to Stellify elements in ONE operation. This is the FASTEST way to build interfaces!
+
+Instead of creating elements one-by-one, write standard HTML with full attributes and this will:
+1. Parse the HTML structure
+2. Create all elements with proper nesting
+3. Preserve all attributes, classes, text content
+4. Attach to page or parent element
+
+Example HTML:
+<div class="container mx-auto p-4">
+  <form method="POST" action="/contact">
+    <input type="email" placeholder="Email" required class="form-input" />
+    <button type="submit" class="btn-primary">Send</button>
+  </form>
+</div>
+
+Use 'test: true' to preview the structure without creating.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        elements: {
+          type: 'string',
+          description: 'HTML string to convert (can be full page structure or fragments)',
+        },
+        page: {
+          type: 'string',
+          description: 'Route UUID to attach root element to (for top-level elements)',
+        },
+        selection: {
+          type: 'string',
+          description: 'Parent element UUID to attach to (for nested elements)',
+        },
+        test: {
+          type: 'boolean',
+          description: 'If true, returns structure without creating elements (for preview)',
+          default: false,
+        },
+      },
+      required: ['elements'],
+    },
+  },
 ];
 
 // Create MCP server
@@ -564,6 +607,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 message: `Found ${result.data.length} elements`,
                 elements: result.data,
                 pagination: result.pagination,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'html_to_elements': {
+        const result = await stellify.htmlToElements(args as any);
+        const elementCount = Object.keys(result.data || {}).length;
+        const testMode = (args as any).test ? ' (TEST MODE - not created)' : '';
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Converted HTML to ${elementCount} elements${testMode}`,
+                elements: result.data,
               }, null, 2),
             },
           ],
