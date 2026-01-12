@@ -7,6 +7,8 @@ dist/
 
 # Environment
 .env
+.mcpregistry_github_token
+.mcpregistry_registry_token
 
 # Logs
 *.log

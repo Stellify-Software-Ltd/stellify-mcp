@@ -10,6 +10,8 @@ test-api.js
 # Development
 .env
 .env.example
+.mcpregistry_github_token
+.mcpregistry_registry_token
 
 # IDE
 .vscode/
