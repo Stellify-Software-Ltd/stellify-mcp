@@ -50,8 +50,23 @@ export interface SearchFilesParams {
   direction?: 'asc' | 'desc';
 }
 
+export interface CreateRouteParams {
+  project_id: string;
+  name: string;
+  path: string;
+  method: string;
+  type?: string;
+  data?: any;
+}
+
+export interface CreateElementParams {
+  type: string;
+  page?: string;
+  parent?: string;
+}
+
 export class StellifyClient {
-  private client: AxiosInstance;
+  public client: AxiosInstance;
 
   constructor(config: StellifyConfig) {
     this.client = axios.create({
@@ -96,6 +111,46 @@ export class StellifyClient {
 
   async getMethod(uuid: string) {
     const response = await this.client.get(`/method/${uuid}`);
+    return response.data;
+  }
+
+  async createRoute(params: CreateRouteParams) {
+    const response = await this.client.post('/route', params);
+    return response.data;
+  }
+
+  async createElement(params: CreateElementParams) {
+    const response = await this.client.post('/v2/element', params);
+    return response.data;
+  }
+
+  async updateElement(uuid: string, data: any) {
+    const response = await this.client.put(`/v2/element/${uuid}`, data);
+    return response.data;
+  }
+
+  async getElement(uuid: string) {
+    const response = await this.client.get(`/v2/element/${uuid}`);
+    return response.data;
+  }
+
+  async getElementTree(uuid: string) {
+    const response = await this.client.get(`/v2/element/${uuid}/tree`);
+    return response.data;
+  }
+
+  async deleteElement(uuid: string) {
+    const response = await this.client.delete(`/v2/element/${uuid}`);
+    return response.data;
+  }
+
+  async searchElements(params: {
+    search?: string;
+    type?: string;
+    include_metadata?: boolean;
+    per_page?: number;
+  }) {
+    const response = await this.client.get('/v2/element/search', { params });
     return response.data;
   }
 }

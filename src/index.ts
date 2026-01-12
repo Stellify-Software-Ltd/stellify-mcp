@@ -163,6 +163,189 @@ const tools: Tool[] = [
       },
     },
   },
+  {
+    name: 'create_route',
+    description: 'Create a new route/page in a Stellify project',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: {
+          type: 'string',
+          description: 'The UUID of the Stellify project',
+        },
+        name: {
+          type: 'string',
+          description: 'Route/page name (e.g., "Home", "Todos", "About")',
+        },
+        path: {
+          type: 'string',
+          description: 'URL path (e.g., "/", "/todos", "/about")',
+        },
+        method: {
+          type: 'string',
+          enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+          description: 'HTTP method',
+          default: 'GET',
+        },
+        type: {
+          type: 'string',
+          description: 'Route type (e.g., "page", "api")',
+          default: 'page',
+        },
+        data: {
+          type: 'object',
+          description: 'Additional route data (title, description, element UUIDs)',
+        },
+      },
+      required: ['project_id', 'name', 'path', 'method'],
+    },
+  },
+  {
+    name: 'create_element',
+    description: `Create a new UI element on a page (for Elements v2). Provide either page (route UUID) for root elements, or parent (element UUID) for child elements.
+
+Valid element types:
+- HTML5: s-wrapper, s-input, s-form, s-svg, s-shape, s-media, s-iframe
+- Components: s-loop, s-transition, s-freestyle, s-motion
+- Blade: s-directive
+- Shadcn/ui: s-chart, s-table, s-combobox, s-accordion, s-calendar, s-contiguous`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: {
+          type: 'string',
+          enum: [
+            's-wrapper', 's-input', 's-form', 's-svg', 's-shape', 's-media', 's-iframe',
+            's-loop', 's-transition', 's-freestyle', 's-motion',
+            's-directive',
+            's-chart', 's-table', 's-combobox', 's-accordion', 's-calendar', 's-contiguous'
+          ],
+          description: 'Element type - must be one of the valid Stellify element types',
+        },
+        page: {
+          type: 'string',
+          description: 'UUID of the page/route to add the element to (for root elements)',
+        },
+        parent: {
+          type: 'string',
+          description: 'UUID of the parent element (for child elements)',
+        },
+      },
+      required: ['type'],
+    },
+  },
+  {
+    name: 'update_element',
+    description: `Update an existing UI element (for Elements v2).
+
+Use standard HTML attributes directly (placeholder, href, src, type, etc.).
+
+Special Stellify fields:
+- name: Element name in editor
+- type: Element type (s-wrapper, s-input, etc.)
+- locked: Prevent editing (boolean)
+- tag: HTML tag (div, input, button, etc.)
+- classes: CSS classes array ["class1", "class2"]
+- text: Element text content
+
+Example:
+{
+  "uuid": "element-uuid",
+  "data": {
+    "name": "Email Input",
+    "tag": "input",
+    "type": "email",
+    "placeholder": "Enter email",
+    "classes": ["form-input", "w-full"],
+    "required": true
+  }
+}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the element to update',
+        },
+        data: {
+          type: 'object',
+          description: 'Flat object with HTML attributes and Stellify fields (name, type, locked, tag, classes, text)',
+        },
+      },
+      required: ['uuid', 'data'],
+    },
+  },
+  {
+    name: 'get_element',
+    description: 'Get a single element by UUID. Returns the element data with all its attributes.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the element to retrieve',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
+    name: 'get_element_tree',
+    description: 'Get an element with all its descendants (children, grandchildren, etc.) as a hierarchical tree structure.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the root element',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
+    name: 'delete_element',
+    description: 'Delete an element and all its children (CASCADE). Returns the count of deleted elements.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the element to delete',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
+    name: 'search_elements',
+    description: `Search for elements in the project. Useful for finding elements by name, type, or content.
+
+Note: To reorder elements, use update_element to modify the parent element's 'data' array with the new order of child UUIDs.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        search: {
+          type: 'string',
+          description: 'Search query to match against element name, type, or content',
+        },
+        type: {
+          type: 'string',
+          description: 'Filter by element type (e.g., s-wrapper, s-input)',
+        },
+        include_metadata: {
+          type: 'boolean',
+          description: 'Include additional metadata',
+          default: false,
+        },
+        per_page: {
+          type: 'number',
+          description: 'Results per page (1-100)',
+          default: 20,
+        },
+      },
+    },
+  },
 ];
 
 // Create MCP server
@@ -265,6 +448,122 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: JSON.stringify({
                 success: true,
                 results: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'create_route': {
+        const result = await stellify.createRoute(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Created route "${(args as any).name}" at ${(args as any).path}`,
+                route: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'create_element': {
+        const result = await stellify.createElement(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Created element of type "${(args as any).type}"`,
+                element: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'update_element': {
+        const { uuid, data } = args as any;
+        const result = await stellify.updateElement(uuid, data);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Updated element ${uuid}`,
+                element: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_element': {
+        const { uuid } = args as any;
+        const result = await stellify.getElement(uuid);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                element: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_element_tree': {
+        const { uuid } = args as any;
+        const result = await stellify.getElementTree(uuid);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Retrieved element tree for ${uuid}`,
+                tree: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'delete_element': {
+        const { uuid } = args as any;
+        const result = await stellify.deleteElement(uuid);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Deleted element ${uuid} and ${result.deleted_count} total elements`,
+                deleted_count: result.deleted_count,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'search_elements': {
+        const result = await stellify.searchElements(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Found ${result.data.length} elements`,
+                elements: result.data,
+                pagination: result.pagination,
               }, null, 2),
             },
           ],
