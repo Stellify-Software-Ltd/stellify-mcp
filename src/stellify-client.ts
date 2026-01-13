@@ -163,4 +163,61 @@ export class StellifyClient {
     const response = await this.client.post('/html/elements', params);
     return response.data;
   }
+
+  // Global methods (Application DB)
+  async listGlobals() {
+    const response = await this.client.get('/globals/');
+    return response.data;
+  }
+
+  async getGlobal(uuid: string) {
+    const response = await this.client.get(`/globals/file/${uuid}`);
+    return response.data;
+  }
+
+  async installGlobal(params: { file_uuid: string; directory_uuid: string }) {
+    const response = await this.client.post('/globals/install', params);
+    return response.data;
+  }
+
+  async searchGlobalMethods(params: { query: string }) {
+    const response = await this.client.post('/method/search-global', params);
+    return response.data;
+  }
+
+  // Module methods (groups of globals)
+  async listModules() {
+    const response = await this.client.get('/modules/');
+    return response.data;
+  }
+
+  async getModule(uuid: string) {
+    const response = await this.client.get(`/modules/${uuid}`);
+    return response.data;
+  }
+
+  async createModule(params: { name: string; description?: string; version?: string; tags?: string[] }) {
+    const response = await this.client.post('/modules/', params);
+    return response.data;
+  }
+
+  async addFileToModule(params: { module_uuid: string; file_uuid: string; order?: number }) {
+    const response = await this.client.post('/modules/add-file', params);
+    return response.data;
+  }
+
+  async removeFileFromModule(moduleUuid: string, fileUuid: string) {
+    const response = await this.client.delete(`/modules/${moduleUuid}/file/${fileUuid}`);
+    return response.data;
+  }
+
+  async installModule(params: { module_uuid: string; directory_uuid: string }) {
+    const response = await this.client.post('/modules/install', params);
+    return response.data;
+  }
+
+  async deleteModule(uuid: string) {
+    const response = await this.client.delete(`/modules/${uuid}`);
+    return response.data;
+  }
 }

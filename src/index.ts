@@ -389,6 +389,150 @@ Use 'test: true' to preview the structure without creating.`,
       required: ['elements'],
     },
   },
+  {
+    name: 'list_globals',
+    description: 'List all global files in the Application database. Globals are reusable, curated code (controllers, models, services) that can be installed into tenant projects.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'get_global',
+    description: 'Get a global file with all its methods, statements, and clauses. Returns the full structure of a reusable code file.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the global file to retrieve',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
+    name: 'install_global',
+    description: 'Install a global file from the Application database into a tenant project. Copies the file, methods, and statements to the tenant database with the same UUIDs (for deduplication). Clauses remain shared in the Application DB.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file_uuid: {
+          type: 'string',
+          description: 'UUID of the global file to install',
+        },
+        directory_uuid: {
+          type: 'string',
+          description: 'UUID of the directory in the tenant project to install the file into',
+        },
+      },
+      required: ['file_uuid', 'directory_uuid'],
+    },
+  },
+  {
+    name: 'search_global_methods',
+    description: 'Search for methods across the Application database (global/framework methods). Use this to find reusable Laravel framework methods, facades, and shared code.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query to find methods by name',
+        },
+      },
+      required: ['query'],
+    },
+  },
+  // Module tools (groups of globals)
+  {
+    name: 'list_modules',
+    description: 'List all available modules. A module is a named collection of related global files that can be installed together as a package.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'get_module',
+    description: 'Get a module with all its files. Returns the module metadata and list of global files it contains, in installation order.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the module to retrieve',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
+    name: 'create_module',
+    description: 'Create a new module to group related global files together.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Unique name for the module (e.g., "laravel-sanctum-auth")',
+        },
+        description: {
+          type: 'string',
+          description: 'Description of what the module provides',
+        },
+        version: {
+          type: 'string',
+          description: 'Version string (default: "1.0.0")',
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags for categorization (e.g., ["auth", "api", "sanctum"])',
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'add_file_to_module',
+    description: 'Add a global file to a module. Files are installed in order when the module is installed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        module_uuid: {
+          type: 'string',
+          description: 'UUID of the module',
+        },
+        file_uuid: {
+          type: 'string',
+          description: 'UUID of the global file to add',
+        },
+        order: {
+          type: 'number',
+          description: 'Installation order (optional, auto-increments if not specified)',
+        },
+      },
+      required: ['module_uuid', 'file_uuid'],
+    },
+  },
+  {
+    name: 'install_module',
+    description: 'Install all files from a module into a tenant project. Copies files, methods, and statements in the defined order. Clauses remain shared in the Application DB.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        module_uuid: {
+          type: 'string',
+          description: 'UUID of the module to install',
+        },
+        directory_uuid: {
+          type: 'string',
+          description: 'UUID of the directory in the tenant project to install files into',
+        },
+      },
+      required: ['module_uuid', 'directory_uuid'],
+    },
+  },
 ];
 
 // Create MCP server
@@ -625,6 +769,152 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 success: true,
                 message: `Converted HTML to ${elementCount} elements${testMode}`,
                 elements: result.data,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'list_globals': {
+        const result = await stellify.listGlobals();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Found ${result.data?.length || 0} globals`,
+                globals: result.data,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_global': {
+        const { uuid } = args as any;
+        const result = await stellify.getGlobal(uuid);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                global: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'install_global': {
+        const result = await stellify.installGlobal(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Installed global "${result.data?.file_name}" (${result.data?.methods_copied} methods, ${result.data?.statements_copied} statements)`,
+                data: result.data,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'search_global_methods': {
+        const result = await stellify.searchGlobalMethods(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Found ${result.data?.length || 0} global methods`,
+                methods: result.data,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      // Module handlers
+      case 'list_modules': {
+        const result = await stellify.listModules();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Found ${result.data?.length || 0} modules`,
+                modules: result.data,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_module': {
+        const { uuid } = args as any;
+        const result = await stellify.getModule(uuid);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                module: result.module,
+                files: result.files,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'create_module': {
+        const result = await stellify.createModule(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Created module "${result.data?.name}"`,
+                data: result.data,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'add_file_to_module': {
+        const result = await stellify.addFileToModule(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Added "${result.data?.file_name}" to module (order: ${result.data?.order})`,
+                data: result.data,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'install_module': {
+        const result = await stellify.installModule(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Installed module "${result.data?.module_name}" (${result.data?.files_installed} files, ${result.data?.methods_copied} methods, ${result.data?.statements_copied} statements)`,
+                data: result.data,
               }, null, 2),
             },
           ],
