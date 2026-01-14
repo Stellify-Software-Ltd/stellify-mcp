@@ -94,6 +94,11 @@ export class StellifyClient {
     return response.data;
   }
 
+  async addStatementCode(params: { file_uuid: string; statement_uuid: string; code: string }) {
+    const response = await this.client.post('/code', params);
+    return response.data;
+  }
+
   async searchMethods(params: SearchMethodsParams) {
     const response = await this.client.get('/method/search', { params });
     return response.data;
@@ -109,8 +114,28 @@ export class StellifyClient {
     return response.data;
   }
 
+  async saveFile(uuid: string, data: any) {
+    const response = await this.client.put(`/file/${uuid}`, data);
+    return response.data;
+  }
+
   async getMethod(uuid: string) {
     const response = await this.client.get(`/method/${uuid}`);
+    return response.data;
+  }
+
+  async createStatement(params: { file?: string; method?: string }) {
+    const response = await this.client.post('/statement', params);
+    return response.data;
+  }
+
+  async getStatement(uuid: string) {
+    const response = await this.client.get(`/statement/${uuid}`);
+    return response.data;
+  }
+
+  async saveStatement(uuid: string, data: any) {
+    const response = await this.client.put(`/statement/${uuid}`, data);
     return response.data;
   }
 
@@ -218,6 +243,22 @@ export class StellifyClient {
 
   async deleteModule(uuid: string) {
     const response = await this.client.delete(`/modules/${uuid}`);
+    return response.data;
+  }
+
+  // Directory methods
+  async getDirectory(uuid: string) {
+    const response = await this.client.get(`/directory/${uuid}`);
+    return response.data;
+  }
+
+  async createDirectory(params: { name: string }) {
+    const response = await this.client.post('/directory', params);
+    return response.data;
+  }
+
+  async saveDirectory(uuid: string, data: any) {
+    const response = await this.client.put(`/directory/${uuid}`, { uuid, data });
     return response.data;
   }
 }
