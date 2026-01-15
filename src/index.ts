@@ -27,11 +27,91 @@ const stellify = new StellifyClient({
   apiToken: API_TOKEN,
 });
 
+// =============================================================================
+// STELLIFY AI WORKFLOW GUIDE
+// =============================================================================
+// Stellify stores code as structured JSON, not text files.
+// This enables surgical AI edits at the statement level.
+//
+// SUPPORTED FILE TYPES:
+// - PHP: Controllers, Models, Middleware, Classes
+// - JavaScript/TypeScript: JS files, Vue SFCs
+// - UI: Elements (HTML structure stored as JSON)
+//
+// -----------------------------------------------------------------------------
+// GENERAL WORKFLOW (applies to all file types)
+// -----------------------------------------------------------------------------
+// 1. Create file skeleton (create_file) - empty structure, no methods yet
+// 2. Add methods (create_method) - creates signature only
+// 3. Add method bodies (add_method_body) - implementation code
+// 4. Add statements (create_statement + add_statement_code) - for non-method code
+// 5. Save file (save_file) - finalize with all references
+//
+// -----------------------------------------------------------------------------
+// PHP EXAMPLE: Creating a Controller
+// -----------------------------------------------------------------------------
+// 1. create_file: type='controller', name='UserController'
+// 2. create_method: name='store', parameters=[{name:'request', type:'Request'}]
+// 3. add_method_body: code='return response()->json($request->all());'
+//
+// -----------------------------------------------------------------------------
+// VUE EXAMPLE: Creating a Component
+// -----------------------------------------------------------------------------
+// Vue components need UI elements linked to the file. Order matters because
+// entities reference each other by UUID:
+//
+// 1. create_route - page to attach elements to
+// 2. create_file - type='js' in js directory
+// 3. html_to_elements - convert HTML to elements, attach to route
+// 4. create_statement + add_statement_code - for refs: const count = ref(0);
+// 5. create_method + add_method_body - component methods
+// 6. update_element - wire click/submit handlers to method UUIDs
+// 7. save_file - set extension='vue', template=[elementUuids], data=[statementUuids, methodUuids]
+//
+// Vue SFC file structure:
+//   - extension: 'vue'
+//   - template: Array of root element UUIDs (<template> section)
+//   - data: Array of statement/method UUIDs (<script setup> section)
+//   - includes: Array of file UUIDs to import
+//
+// -----------------------------------------------------------------------------
+// ELEMENT EVENT HANDLERS (for frontend files)
+// -----------------------------------------------------------------------------
+// Elements can have these event properties (value is method UUID):
+//   - click: Fires on click
+//   - submit: Fires on form submit
+//   - change: Fires on input change
+//   - input: Fires on input (real-time)
+//
+// =============================================================================
+
 // Define MCP tools
 const tools: Tool[] = [
   {
+    name: 'get_project',
+    description: `Get the active Stellify project for the authenticated user.
+
+IMPORTANT: Call this first before any other operations to get the project UUID.
+Returns project details including UUID, name, and configuration.
+
+This is the starting point for all Stellify workflows - you need the project UUID
+for operations like create_file, create_route, etc.`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
     name: 'create_file',
-    description: 'Create a new file (class, model, controller, middleware) in a Stellify project. This creates the file structure but no methods yet.',
+    description: `Create a new file (PHP class, controller, model, middleware, or JS file) in a Stellify project.
+
+This creates the file skeleton with no methods yet. After creation:
+1. Use create_method to add methods
+2. Use add_method_body to implement them
+3. Use save_file to finalize
+
+For PHP: Creates in appropriate namespace based on type.
+For Vue: Create with type='js', add methods/statements, then save_file with extension='vue'.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -248,16 +328,19 @@ Special Stellify fields:
 - classes: CSS classes array ["class1", "class2"]
 - text: Element text content
 
-Example:
+EVENT HANDLERS (for Vue components):
+- click: Method UUID to call on click (for buttons)
+- submit: Method UUID to call on form submit
+- change: Method UUID to call on input change
+- input: Method UUID to call on input (real-time)
+
+Example wiring a button to a method:
 {
-  "uuid": "element-uuid",
+  "uuid": "button-element-uuid",
   "data": {
-    "name": "Email Input",
-    "tag": "input",
-    "type": "email",
-    "placeholder": "Enter email",
-    "classes": ["form-input", "w-full"],
-    "required": true
+    "tag": "button",
+    "text": "Increment",
+    "click": "method-uuid-here"
   }
 }`,
     inputSchema: {
@@ -533,7 +616,169 @@ Use 'test: true' to preview the structure without creating.`,
       required: ['module_uuid', 'directory_uuid'],
     },
   },
+  // =============================================================================
+  // STATEMENT & FILE MANAGEMENT TOOLS
+  // =============================================================================
+  {
+    name: 'create_statement',
+    description: `Create a statement in a file for code that lives outside methods.
+
+Use cases:
+- PHP: Class properties, use statements, constants
+- JS/Vue: Variable declarations, imports, reactive refs like const count = ref(0);
+
+After creating, use add_statement_code to add the actual code.
+Include the statement UUID in the file's 'data' or 'statements' array when calling save_file.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          description: 'UUID of the file to add the statement to',
+        },
+        method: {
+          type: 'string',
+          description: 'UUID of the method to add the statement to (for method body statements)',
+        },
+      },
+    },
+  },
+  {
+    name: 'add_statement_code',
+    description: `Add code to a statement. Use after create_statement to set the actual code content.
+
+Examples:
+- PHP: "use Illuminate\\Http\\Request;" or "private $items = [];"
+- JS/Vue: "const count = ref(0);" or "import axios from 'axios';"`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file_uuid: {
+          type: 'string',
+          description: 'UUID of the file containing the statement',
+        },
+        statement_uuid: {
+          type: 'string',
+          description: 'UUID of the statement to add code to',
+        },
+        code: {
+          type: 'string',
+          description: 'The code to add (e.g., "const count = ref(0);")',
+        },
+      },
+      required: ['file_uuid', 'statement_uuid', 'code'],
+    },
+  },
+  {
+    name: 'save_file',
+    description: `Save/update a file with its full configuration.
+
+IMPORTANT: This is a full replacement, not a partial update. To update a file:
+1. Call get_file to fetch current state
+2. Modify the returned object
+3. Call save_file with the complete object
+
+Common fields:
+- name: File name (without extension)
+- extension: 'php', 'js', 'ts', or 'vue'
+- data: Array of statement/method UUIDs (for script content)
+- includes: Array of file UUIDs to import
+
+Vue-specific fields:
+- template: Array of root element UUIDs (the <template> section)
+- extension: Must be 'vue' for Vue SFCs
+
+PHP files typically don't need 'template' - just methods and statements.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the file to save',
+        },
+        name: {
+          type: 'string',
+          description: 'File name (without extension)',
+        },
+        extension: {
+          type: 'string',
+          description: 'File extension: "vue" for Vue SFCs, "js" for JavaScript, "ts" for TypeScript',
+        },
+        template: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of root element UUIDs for Vue template section',
+        },
+        data: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of statement and method UUIDs for Vue script setup section',
+        },
+        includes: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of file UUIDs to import',
+        },
+        statements: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of statement UUIDs (for non-Vue JS files)',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
+    name: 'get_file',
+    description: 'Get a file by UUID with all its metadata, methods, and statements.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the file to retrieve',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
+    name: 'create_directory',
+    description: `Create or get a directory for organizing files.
+
+Common directories:
+- 'js' for JavaScript/Vue files
+- 'css' for stylesheets
+- 'components' for reusable components
+
+Returns existing directory if one with the same name exists.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Directory name (e.g., "js", "css", "components")',
+        },
+      },
+      required: ['name'],
+    },
+  },
 ];
+
+// Server instructions for tool discovery (used by MCP Tool Search)
+const SERVER_INSTRUCTIONS = `Stellify is a coding platform where you code alongside AI on a codebase maintained and curated by AI. Build Laravel/PHP and Vue.js applications.
+
+Use Stellify tools when:
+- Building PHP controllers, models, middleware, or classes
+- Creating Vue.js components with reactive state and UI
+- Managing UI elements (HTML stored as structured JSON)
+- Working with a Stellify project (user will mention "Stellify" or provide project UUID)
+
+Key concepts:
+- Code is stored as structured JSON, enabling surgical AI edits at the statement level
+- Files contain methods and statements (code outside methods)
+- Vue components link to UI elements via the 'template' field
+- Event handlers (click, submit) wire UI elements to methods by UUID`;
 
 // Create MCP server
 const server = new Server(
@@ -545,6 +790,7 @@ const server = new Server(
     capabilities: {
       tools: {},
     },
+    instructions: SERVER_INSTRUCTIONS,
   }
 );
 
@@ -563,6 +809,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     switch (name) {
+      case 'get_project': {
+        const result = await stellify.getProject();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Active project: "${result.data?.name || result.name}" (${result.data?.uuid || result.uuid})`,
+                project: result.data || result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
       case 'create_file': {
         const result = await stellify.createFile(args as any);
         return {
@@ -915,6 +1177,91 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 success: true,
                 message: `Installed module "${result.data?.module_name}" (${result.data?.files_installed} files, ${result.data?.methods_copied} methods, ${result.data?.statements_copied} statements)`,
                 data: result.data,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      // Statement & File Management handlers
+      case 'create_statement': {
+        const result = await stellify.createStatement(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Created statement (${result.data?.uuid || result.uuid})`,
+                statement: result.data || result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'add_statement_code': {
+        const result = await stellify.addStatementCode(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: 'Statement code added successfully',
+                data: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'save_file': {
+        const { uuid, ...data } = args as any;
+        const result = await stellify.saveFile(uuid, { uuid, ...data });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Saved file "${data.name || uuid}"`,
+                file: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_file': {
+        const { uuid } = args as any;
+        const result = await stellify.getFile(uuid);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                file: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'create_directory': {
+        const result = await stellify.createDirectory(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: result.existing
+                  ? `Using existing directory "${(args as any).name}" (${result.data?.uuid || result.uuid})`
+                  : `Created directory "${(args as any).name}" (${result.data?.uuid || result.uuid})`,
+                directory: result.data || result,
+                existing: result.existing || false,
               }, null, 2),
             },
           ],

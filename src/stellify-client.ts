@@ -261,4 +261,10 @@ export class StellifyClient {
     const response = await this.client.put(`/directory/${uuid}`, { uuid, data });
     return response.data;
   }
+
+  // Project methods
+  async getProject() {
+    const response = await this.client.get('/getProject');
+    return response.data;
+  }
 }
