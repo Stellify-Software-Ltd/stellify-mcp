@@ -1,0 +1,92 @@
+{
+  "manifest_version": "0.3",
+  "name": "stellify-mcp",
+  "display_name": "Stellify MCP",
+  "version": "0.1.2",
+  "description": "Build Laravel and Vue.js apps through conversation with AI-native structured code editing",
+  "long_description": "Stellify MCP bridges Claude with Stellify - an AI-native code generation platform. Unlike traditional file-based code, Stellify stores code as structured JSON in a database, enabling:\n\n- **Surgical, statement-level edits** - AI can modify specific code statements without risk of breaking surrounding code\n- **Queryable code** - Find all methods using a specific class, trace dependencies instantly\n- **34 specialized tools** for project management, file/method creation, Vue component building, UI elements, and a reusable code library\n- **Incremental development workflow** - Build applications step-by-step with full type safety\n\nSupports Laravel/PHP (controllers, models, middleware) and Vue.js (reactive components, event handlers, templates).",
+  "author": {
+    "name": "Stellisoft",
+    "email": "stellifysoftware@gmail.com",
+    "url": "https://stellisoft.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Stellify-Software-Ltd/stellify-mcp.git"
+  },
+  "homepage": "https://stellisoft.com",
+  "documentation": "https://github.com/Stellify-Software-Ltd/stellify-mcp#readme",
+  "support": "https://github.com/Stellify-Software-Ltd/stellify-mcp/issues",
+  "keywords": ["laravel", "vue", "php", "code-generation", "ai-native", "structured-code"],
+  "license": "MIT",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "STELLIFY_API_URL": "${user_config.api_url}",
+        "STELLIFY_API_TOKEN": "${user_config.api_token}"
+      }
+    }
+  },
+  "tools": [
+    {"name": "get_project", "description": "Get the active project and directory structure"},
+    {"name": "create_file", "description": "Create a new file (class, model, controller, middleware, or Vue.js)"},
+    {"name": "get_file", "description": "Retrieve a file with all methods and statements"},
+    {"name": "save_file", "description": "Finalize file configuration"},
+    {"name": "get_directory", "description": "List directory contents"},
+    {"name": "create_directory", "description": "Create a new directory"},
+    {"name": "search_files", "description": "Find files by name or type"},
+    {"name": "create_method", "description": "Create method signatures with type hints"},
+    {"name": "add_method_body", "description": "Add implementation code to methods"},
+    {"name": "search_methods", "description": "Find methods by name or file"},
+    {"name": "create_statement", "description": "Create statements (non-method code)"},
+    {"name": "add_statement_code", "description": "Add code to statements"},
+    {"name": "get_statement", "description": "Retrieve statement with clauses"},
+    {"name": "create_route", "description": "Create new routes (web pages or API endpoints)"},
+    {"name": "get_route", "description": "Retrieve route details"},
+    {"name": "search_routes", "description": "Search for existing routes"},
+    {"name": "create_element", "description": "Create UI elements on pages"},
+    {"name": "update_element", "description": "Update elements with attributes and event handlers"},
+    {"name": "get_element", "description": "Retrieve a single element"},
+    {"name": "get_element_tree", "description": "Get element with full hierarchical structure"},
+    {"name": "delete_element", "description": "Delete element and children"},
+    {"name": "search_elements", "description": "Search elements by name, type, or content"},
+    {"name": "html_to_elements", "description": "Convert HTML to Stellify elements in one operation"},
+    {"name": "list_globals", "description": "List reusable code in application database"},
+    {"name": "get_global", "description": "Get full global file structure"},
+    {"name": "install_global", "description": "Install global file into project"},
+    {"name": "search_global_methods", "description": "Search framework/global methods"},
+    {"name": "list_modules", "description": "List available module packages"},
+    {"name": "get_module", "description": "Get module with all files"},
+    {"name": "create_module", "description": "Create new module for grouping globals"},
+    {"name": "add_file_to_module", "description": "Add file to module"},
+    {"name": "install_module", "description": "Install entire module into project"}
+  ],
+  "tools_generated": false,
+  "compatibility": {
+    "claude_desktop": ">=1.0.0",
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  },
+  "user_config": {
+    "api_token": {
+      "type": "string",
+      "title": "Stellify API Token",
+      "description": "Your Stellify API token (get from stellisoft.com/settings/tokens)",
+      "sensitive": true,
+      "required": true
+    },
+    "api_url": {
+      "type": "string",
+      "title": "Stellify API URL",
+      "description": "Stellify API endpoint URL",
+      "required": false,
+      "default": "https://stellisoft.com/api/v1"
+    }
+  }
+}
