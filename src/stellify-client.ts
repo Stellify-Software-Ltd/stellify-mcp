@@ -144,6 +144,16 @@ export class StellifyClient {
     return response.data;
   }
 
+  async getRoute(uuid: string) {
+    const response = await this.client.get(`/route/${uuid}`);
+    return response.data;
+  }
+
+  async searchRoutes(params: { search?: string; type?: string }) {
+    const response = await this.client.get('/route/search', { params });
+    return response.data;
+  }
+
   async createElement(params: CreateElementParams) {
     const response = await this.client.post('/element', params);
     return response.data;

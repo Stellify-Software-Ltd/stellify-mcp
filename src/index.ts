@@ -55,33 +55,46 @@ const stellify = new StellifyClient({
 // 3. add_method_body: code='return response()->json($request->all());'
 //
 // -----------------------------------------------------------------------------
-// VUE EXAMPLE: Creating a Component
+// VUE COMPONENT WORKFLOW (step-by-step)
 // -----------------------------------------------------------------------------
-// Vue components need UI elements linked to the file. Order matters because
-// entities reference each other by UUID:
+// Vue components combine UI elements with reactive data. Follow this order:
 //
-// 1. create_route - page to attach elements to
-// 2. create_file - type='js' in js directory
-// 3. html_to_elements - convert HTML to elements, attach to route
-// 4. create_statement + add_statement_code - for refs: const count = ref(0);
-// 5. create_method + add_method_body - component methods
-// 6. update_element - wire click/submit handlers to method UUIDs
-// 7. save_file - set extension='vue', template=[elementUuids], data=[statementUuids, methodUuids]
+// 1. get_project - Find the 'js' directory UUID
+// 2. create_file - type='js', extension='vue' in js directory
+// 3. Create statements for IMPORTS and DATA (each needs create_statement + add_statement_code):
+//    - "import { ref } from 'vue';"  ← REQUIRED for using ref()
+//    - "const count = ref(0);"
+//    NOTE: Vue imports are NOT auto-generated. You must add them manually.
+// 4. create_method - Creates method signature (returns UUID)
+//    add_method_body - Add implementation: "count.value++;"
+// 5. html_to_elements - Convert template HTML to elements (no 'page' needed)
+//    NOTE: Vue bindings like {{ count }} auto-create statements linked to elements
+// 6. update_element - Wire event handlers (e.g., click → method UUID)
+// 7. save_file - Finalize with:
+//    - extension: 'vue'
+//    - template: [rootElementUuid] (from html_to_elements)
+//    - data: [importStmtUuid, countStmtUuid, methodUuid] (ALL script setup code, in order!)
 //
 // Vue SFC file structure:
 //   - extension: 'vue'
 //   - template: Array of root element UUIDs (<template> section)
-//   - data: Array of statement/method UUIDs (<script setup> section)
+//   - data: Array of ALL statement AND method UUIDs (<script setup> section)
 //   - includes: Array of file UUIDs to import
 //
 // -----------------------------------------------------------------------------
 // ELEMENT EVENT HANDLERS (for frontend files)
 // -----------------------------------------------------------------------------
 // Elements can have these event properties (value is method UUID):
-//   - click: Fires on click
-//   - submit: Fires on form submit
-//   - change: Fires on input change
-//   - input: Fires on input (real-time)
+//   - click: Fires on click (@click)
+//   - submit: Fires on form submit (@submit)
+//   - change: Fires on input change (@change)
+//   - input: Fires on input in real-time (@input)
+//   - focus: Fires when element receives focus (@focus)
+//   - blur: Fires when element loses focus (@blur)
+//   - keydown: Fires on key press (@keydown)
+//   - keyup: Fires on key release (@keyup)
+//   - mouseenter: Fires on mouse enter (@mouseenter)
+//   - mouseleave: Fires on mouse leave (@mouseleave)
 //
 // =============================================================================
 
@@ -91,11 +104,16 @@ const tools: Tool[] = [
     name: 'get_project',
     description: `Get the active Stellify project for the authenticated user.
 
-IMPORTANT: Call this first before any other operations to get the project UUID.
-Returns project details including UUID, name, and configuration.
+IMPORTANT: Call this first before any other operations.
 
-This is the starting point for all Stellify workflows - you need the project UUID
-for operations like create_file, create_route, etc.`,
+Returns:
+- uuid: Project UUID (needed for most operations)
+- name: Project name
+- branch/branches: Git branch info
+- directories: Array of {uuid, name} for existing directories (js, controllers, models, etc.)
+
+Use the directories array to find existing directories before creating new ones.
+For example, look for a "js" directory before creating Vue components.`,
     inputSchema: {
       type: 'object',
       properties: {},
@@ -103,37 +121,45 @@ for operations like create_file, create_route, etc.`,
   },
   {
     name: 'create_file',
-    description: `Create a new file (PHP class, controller, model, middleware, or JS file) in a Stellify project.
+    description: `Create a new file in a Stellify project.
 
-This creates the file skeleton with no methods yet. After creation:
-1. Use create_method to add methods
-2. Use add_method_body to implement them
-3. Use save_file to finalize
+This creates an EMPTY file shell - no methods, statements, or template yet. The file exists but has no content.
 
-For PHP: Creates in appropriate namespace based on type.
-For Vue: Create with type='js', add methods/statements, then save_file with extension='vue'.`,
+COMPLETE WORKFLOW:
+1. create_file → creates empty shell, returns file UUID
+2. create_statement + add_statement_code → add variables/imports (returns statement UUIDs)
+3. create_method + add_method_body → add functions (returns method UUIDs)
+4. html_to_elements → create template elements (returns element UUIDs)
+5. save_file → FINALIZE by wiring template/data arrays with all collected UUIDs
+
+For PHP: Use type='class', 'model', 'controller', or 'middleware'.
+For Vue: Use type='js' and extension='vue'. Place in the 'js' directory.`,
     inputSchema: {
       type: 'object',
       properties: {
-        project_id: {
+        directory: {
           type: 'string',
-          description: 'The UUID of the Stellify project',
+          description: 'The UUID of the directory to create the file in (get from get_project directories array)',
         },
         name: {
           type: 'string',
-          description: 'File name (e.g., "Calculator", "UserController")',
+          description: 'File name without extension (e.g., "Counter", "UserController")',
         },
         type: {
           type: 'string',
-          enum: ['class', 'model', 'controller', 'middleware'],
-          description: 'Type of file to create',
+          enum: ['class', 'model', 'controller', 'middleware', 'js'],
+          description: 'Type of file: "js" for JavaScript/Vue, others for PHP',
+        },
+        extension: {
+          type: 'string',
+          description: 'File extension. Use "vue" for Vue components, omit for PHP files.',
         },
         namespace: {
           type: 'string',
-          description: 'PHP namespace (e.g., "App\\Services\\", "App\\Http\\Controllers\\")',
+          description: 'PHP namespace (e.g., "App\\Services\\"). Only for PHP files.',
         },
       },
-      required: ['project_id', 'name', 'type'],
+      required: ['directory', 'name', 'type'],
     },
   },
   {
@@ -142,28 +168,26 @@ For Vue: Create with type='js', add methods/statements, then save_file with exte
     inputSchema: {
       type: 'object',
       properties: {
-        file_uuid: {
+        file: {
           type: 'string',
           description: 'UUID of the file to add the method to',
         },
         name: {
           type: 'string',
-          description: 'Method name (e.g., "add", "store", "index")',
+          description: 'Method name (e.g., "increment", "store", "handleClick")',
         },
         visibility: {
           type: 'string',
           enum: ['public', 'protected', 'private'],
-          description: 'Method visibility',
-          default: 'public',
+          description: 'Method visibility (PHP only)',
         },
         is_static: {
           type: 'boolean',
-          description: 'Whether the method is static',
-          default: false,
+          description: 'Whether the method is static (PHP only)',
         },
-        return_type: {
+        returnType: {
           type: 'string',
-          description: 'Return type (e.g., "int", "string", "JsonResponse", "void")',
+          description: 'Return type (e.g., "int", "string", "void")',
         },
         parameters: {
           type: 'array',
@@ -173,18 +197,18 @@ For Vue: Create with type='js', add methods/statements, then save_file with exte
             properties: {
               name: {
                 type: 'string',
-                description: 'Parameter name (without $)',
+                description: 'Parameter name',
               },
               type: {
                 type: 'string',
-                description: 'Parameter type (e.g., "int", "string", "Request")',
+                description: 'Parameter type',
               },
             },
             required: ['name', 'type'],
           },
         },
       },
-      required: ['file_uuid', 'name'],
+      required: ['file', 'name'],
     },
   },
   {
@@ -255,11 +279,11 @@ For Vue: Create with type='js', add methods/statements, then save_file with exte
         },
         name: {
           type: 'string',
-          description: 'Route/page name (e.g., "Home", "Todos", "About")',
+          description: 'Route/page name (e.g., "Home", "Counter", "About")',
         },
         path: {
           type: 'string',
-          description: 'URL path (e.g., "/", "/todos", "/about")',
+          description: 'URL path (e.g., "/", "/counter", "/about")',
         },
         method: {
           type: 'string',
@@ -269,8 +293,9 @@ For Vue: Create with type='js', add methods/statements, then save_file with exte
         },
         type: {
           type: 'string',
-          description: 'Route type (e.g., "page", "api")',
-          default: 'page',
+          enum: ['web', 'api'],
+          description: 'Route type: "web" for pages, "api" for API endpoints',
+          default: 'web',
         },
         data: {
           type: 'object',
@@ -278,6 +303,47 @@ For Vue: Create with type='js', add methods/statements, then save_file with exte
         },
       },
       required: ['project_id', 'name', 'path', 'method'],
+    },
+  },
+  {
+    name: 'get_route',
+    description: `Get a route/page by UUID. Returns route details including name, path, and attached elements.
+
+Use this to look up a route you created or to find existing routes in the project.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'The UUID of the route to retrieve',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
+    name: 'search_routes',
+    description: `Search for routes/pages in the project by name. Use this to find existing routes before creating new ones.
+
+Returns paginated results with route details including UUID, name, path, and type.
+Use the returned UUID with html_to_elements (page parameter) or get_route for full details.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        search: {
+          type: 'string',
+          description: 'Search term to match route names (e.g., "Counter", "Home")',
+        },
+        type: {
+          type: 'string',
+          enum: ['web', 'api'],
+          description: 'Filter by route type: "web" for pages, "api" for endpoints',
+        },
+        per_page: {
+          type: 'number',
+          description: 'Results per page (default: 10)',
+        },
+      },
     },
   },
   {
@@ -328,19 +394,23 @@ Special Stellify fields:
 - classes: CSS classes array ["class1", "class2"]
 - text: Element text content
 
-EVENT HANDLERS (for Vue components):
-- click: Method UUID to call on click (for buttons)
-- submit: Method UUID to call on form submit
-- change: Method UUID to call on input change
-- input: Method UUID to call on input (real-time)
+EVENT HANDLERS (set value to method UUID):
+- click: @click - buttons, links, any clickable element
+- submit: @submit - form submission
+- change: @change - input/select value changed (on blur)
+- input: @input - input value changing (real-time, as user types)
+- focus: @focus - element receives focus
+- blur: @blur - element loses focus
+- keydown: @keydown - key pressed down
+- keyup: @keyup - key released
+- mouseenter: @mouseenter - mouse enters element
+- mouseleave: @mouseleave - mouse leaves element
 
-Example wiring a button to a method:
+Example wiring a button click to a method:
 {
   "uuid": "button-element-uuid",
   "data": {
-    "tag": "button",
-    "text": "Increment",
-    "click": "method-uuid-here"
+    "click": "increment-method-uuid"
   }
 }`,
     inputSchema: {
@@ -433,40 +503,47 @@ Note: To reorder elements, use update_element to modify the parent element's 'da
     name: 'html_to_elements',
     description: `Convert HTML to Stellify elements in ONE operation. This is the FASTEST way to build interfaces!
 
-Instead of creating elements one-by-one, write standard HTML with full attributes and this will:
+This will:
 1. Parse the HTML structure
-2. Create all elements with proper nesting
+2. Create all elements with proper nesting and types
 3. Preserve all attributes, classes, text content
-4. Attach to page or parent element
+4. Auto-detect Vue bindings ({{ variable }}) and create linked statements
+5. Return element UUIDs to use in save_file template array
 
-Example HTML:
-<div class="container mx-auto p-4">
-  <form method="POST" action="/contact">
-    <input type="email" placeholder="Email" required class="form-input" />
-    <button type="submit" class="btn-primary">Send</button>
-  </form>
-</div>
+Element type mapping:
+- button, input, textarea, select → s-input
+- div, span, p, section, etc. → s-wrapper
+- form → s-form
+- img, video, audio → s-media
 
-Use 'test: true' to preview the structure without creating.`,
+VUE BINDING AUTO-DETECTION:
+Text like {{ count }} is automatically detected and:
+- A statement is created with the binding code
+- The statement UUID is added to the element's 'statements' array
+- You still need to create the reactive data source separately (const count = ref(0))
+
+For Vue components: Omit 'page' - elements are created standalone for the component template.
+For page content: Provide 'page' (route UUID) to attach elements directly.
+
+IMPORTANT: Use the returned root element UUID in save_file's template array.`,
     inputSchema: {
       type: 'object',
       properties: {
         elements: {
           type: 'string',
-          description: 'HTML string to convert (can be full page structure or fragments)',
+          description: 'HTML string to convert',
         },
         page: {
           type: 'string',
-          description: 'Route UUID to attach root element to (for top-level elements)',
+          description: 'Route UUID to attach elements to. Optional for Vue components.',
         },
         selection: {
           type: 'string',
-          description: 'Parent element UUID to attach to (for nested elements)',
+          description: 'Parent element UUID to attach to (alternative to page)',
         },
         test: {
           type: 'boolean',
-          description: 'If true, returns structure without creating elements (for preview)',
-          default: false,
+          description: 'If true, returns structure without creating elements',
         },
       },
       required: ['elements'],
@@ -620,15 +697,32 @@ Use 'test: true' to preview the structure without creating.`,
   // STATEMENT & FILE MANAGEMENT TOOLS
   // =============================================================================
   {
+    name: 'get_statement',
+    description: `Get a statement by UUID. Returns the statement data including its clauses (code tokens).`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'The UUID of the statement to retrieve',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
     name: 'create_statement',
-    description: `Create a statement in a file for code that lives outside methods.
+    description: `Create an empty statement in a file. This is step 1 of 2 - you MUST call add_statement_code next to add the actual code.
+
+IMPORTANT: This is a TWO-STEP process:
+1. create_statement → returns statement UUID
+2. add_statement_code → adds the actual code to that statement
 
 Use cases:
 - PHP: Class properties, use statements, constants
-- JS/Vue: Variable declarations, imports, reactive refs like const count = ref(0);
+- JS/Vue: Variable declarations, imports, reactive refs
 
-After creating, use add_statement_code to add the actual code.
-Include the statement UUID in the file's 'data' or 'statements' array when calling save_file.`,
+For Vue components, include the returned statement UUID in save_file's 'data' array.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -645,11 +739,13 @@ Include the statement UUID in the file's 'data' or 'statements' array when calli
   },
   {
     name: 'add_statement_code',
-    description: `Add code to a statement. Use after create_statement to set the actual code content.
+    description: `Add code to an existing statement. This is step 2 of 2 - call this AFTER create_statement.
+
+The statement must already exist (created via create_statement). This parses and stores the code.
 
 Examples:
 - PHP: "use Illuminate\\Http\\Request;" or "private $items = [];"
-- JS/Vue: "const count = ref(0);" or "import axios from 'axios';"`,
+- JS/Vue: "const count = ref(0);" or "import { ref } from 'vue';"`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -671,24 +767,31 @@ Examples:
   },
   {
     name: 'save_file',
-    description: `Save/update a file with its full configuration.
+    description: `Save/update a file with its full configuration. This FINALIZES the file after create_file.
 
-IMPORTANT: This is a full replacement, not a partial update. To update a file:
+WORKFLOW: create_file creates an empty shell → add methods/statements → save_file wires everything together.
+
+IMPORTANT: This is a full replacement, not a partial update. To update an existing file:
 1. Call get_file to fetch current state
 2. Modify the returned object
 3. Call save_file with the complete object
 
-Common fields:
-- name: File name (without extension)
-- extension: 'php', 'js', 'ts', or 'vue'
-- data: Array of statement/method UUIDs (for script content)
-- includes: Array of file UUIDs to import
+Required fields: uuid, name, type
 
-Vue-specific fields:
-- template: Array of root element UUIDs (the <template> section)
-- extension: Must be 'vue' for Vue SFCs
+Vue SFC example:
+  save_file({
+    uuid: fileUuid,
+    name: "Counter",
+    type: "js",
+    extension: "vue",
+    template: [rootElementUuid],  // From html_to_elements
+    data: [statementUuid, methodUuid]  // ALL <script setup> code
+  })
 
-PHP files typically don't need 'template' - just methods and statements.`,
+The 'data' array is a FLAT array containing ALL UUIDs for <script setup> content:
+- Statement UUIDs (from create_statement) - variables, imports, reactive refs
+- Method UUIDs (from create_method) - functions
+Example: data: ["stmt-uuid-1", "method-uuid-1", "stmt-uuid-2"] (order matters!)`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -700,32 +803,32 @@ PHP files typically don't need 'template' - just methods and statements.`,
           type: 'string',
           description: 'File name (without extension)',
         },
+        type: {
+          type: 'string',
+          enum: ['js', 'class', 'controller', 'model', 'middleware'],
+          description: 'File type: "js" for JavaScript/Vue, others for PHP',
+        },
         extension: {
           type: 'string',
-          description: 'File extension: "vue" for Vue SFCs, "js" for JavaScript, "ts" for TypeScript',
+          description: 'File extension: "vue" for Vue SFCs, "js" for JavaScript',
         },
         template: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of root element UUIDs for Vue template section',
+          description: 'Array of root element UUIDs for Vue <template> section (from html_to_elements)',
         },
         data: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of statement and method UUIDs for Vue script setup section',
+          description: 'Array of ALL statement AND method UUIDs for <script setup> content',
         },
         includes: {
           type: 'array',
           items: { type: 'string' },
           description: 'Array of file UUIDs to import',
         },
-        statements: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Array of statement UUIDs (for non-Vue JS files)',
-        },
       },
-      required: ['uuid'],
+      required: ['uuid', 'name', 'type'],
     },
   },
   {
@@ -743,15 +846,32 @@ PHP files typically don't need 'template' - just methods and statements.`,
     },
   },
   {
+    name: 'get_directory',
+    description: `Get a directory by UUID to see its contents.
+
+Use this to inspect directories returned by get_project. The project's data array contains directory UUIDs.
+Returns the directory name and list of files/subdirectories inside it.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'The UUID of the directory to retrieve',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
     name: 'create_directory',
-    description: `Create or get a directory for organizing files.
+    description: `Create a new directory for organizing files.
 
 Common directories:
 - 'js' for JavaScript/Vue files
 - 'css' for stylesheets
 - 'components' for reusable components
 
-Returns existing directory if one with the same name exists.`,
+IMPORTANT: Check existing directories first using get_project and get_directory before creating new ones.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -827,14 +947,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'create_file': {
         const result = await stellify.createFile(args as any);
+        const fileData = result.data || result;
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify({
                 success: true,
-                message: `Created file "${(args as any).name}" (${result.uuid})`,
-                file: result,
+                message: `Created file "${(args as any).name}" (UUID: ${fileData.uuid})`,
+                file: fileData,
               }, null, 2),
             },
           ],
@@ -843,14 +964,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'create_method': {
         const result = await stellify.createMethod(args as any);
+        const methodData = result.data || result;
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify({
                 success: true,
-                message: `Created method "${(args as any).name}" (${result.uuid})`,
-                method: result,
+                message: `Created method "${(args as any).name}" (UUID: ${methodData.uuid})`,
+                method: methodData,
               }, null, 2),
             },
           ],
@@ -905,14 +1027,50 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'create_route': {
         const result = await stellify.createRoute(args as any);
+        const routeData = result.data || result;
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify({
                 success: true,
-                message: `Created route "${(args as any).name}" at ${(args as any).path}`,
-                route: result,
+                message: `Created route "${(args as any).name}" at ${(args as any).path} (UUID: ${routeData.uuid}). Use this UUID for html_to_elements page parameter.`,
+                route: routeData,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_route': {
+        const result = await stellify.getRoute((args as any).uuid);
+        const routeData = result.data || result;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Route: "${routeData.name}" at ${routeData.path}`,
+                route: routeData,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'search_routes': {
+        const result = await stellify.searchRoutes(args as any);
+        const routes = result.data || result;
+        const routeCount = Array.isArray(routes) ? routes.length : Object.keys(routes).length;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Found ${routeCount} routes`,
+                routes: routes,
               }, null, 2),
             },
           ],
@@ -1184,6 +1342,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       // Statement & File Management handlers
+      case 'get_statement': {
+        const result = await stellify.getStatement((args as any).uuid);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Statement retrieved`,
+                statement: result.statement || result,
+                clauses: result.clauses || null,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
       case 'create_statement': {
         const result = await stellify.createStatement(args as any);
         return {
@@ -1243,6 +1418,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: JSON.stringify({
                 success: true,
                 file: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_directory': {
+        const result = await stellify.getDirectory((args as any).uuid);
+        const dirData = result.data || result;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Directory: "${dirData.name}" (${dirData.uuid})`,
+                directory: dirData,
               }, null, 2),
             },
           ],
