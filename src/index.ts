@@ -73,12 +73,14 @@ const stellify = new StellifyClient({
 // 7. save_file - Finalize with:
 //    - extension: 'vue'
 //    - template: [rootElementUuid] (from html_to_elements)
-//    - data: [importStmtUuid, countStmtUuid, methodUuid] (ALL script setup code, in order!)
+//    - data: [methodUuid] (METHOD UUIDs only!)
+//    - statements: [importStmtUuid, countStmtUuid] (STATEMENT UUIDs - imports, refs)
 //
 // Vue SFC file structure:
 //   - extension: 'vue'
 //   - template: Array of root element UUIDs (<template> section)
-//   - data: Array of ALL statement AND method UUIDs (<script setup> section)
+//   - data: Array of METHOD UUIDs only (<script setup> functions)
+//   - statements: Array of STATEMENT UUIDs (<script setup> imports, variables, refs)
 //   - includes: Array of file UUIDs to import
 //
 // -----------------------------------------------------------------------------
@@ -133,7 +135,14 @@ COMPLETE WORKFLOW:
 5. save_file → FINALIZE by wiring template/data arrays with all collected UUIDs
 
 For PHP: Use type='class', 'model', 'controller', or 'middleware'.
-For Vue: Use type='js' and extension='vue'. Place in the 'js' directory.`,
+For Vue: Use type='js' and extension='vue'. Place in the 'js' directory.
+
+DEPENDENCY RESOLUTION (automatic):
+Pass 'includes' as an array of namespace strings (e.g., ["App\\Models\\User", "Illuminate\\Support\\Facades\\Hash"]).
+The system resolves these to UUIDs automatically, creating missing dependencies on-demand:
+- App\\* classes → creates stub file in your project (tenant DB)
+- Illuminate\\*/Laravel\\* → fetches from Laravel API, creates in Application DB
+- Vendor packages → fetches from vendor, creates in Application DB`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -158,13 +167,42 @@ For Vue: Use type='js' and extension='vue'. Place in the 'js' directory.`,
           type: 'string',
           description: 'PHP namespace (e.g., "App\\Services\\"). Only for PHP files.',
         },
+        includes: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of namespace strings to include as dependencies (e.g., ["App\\Models\\User", "Illuminate\\Support\\Facades\\Hash"]). These are resolved to UUIDs automatically.',
+        },
       },
       required: ['directory', 'name', 'type'],
     },
   },
   {
     name: 'create_method',
-    description: 'Create a method signature in a file. This only creates the method declaration, not the body. Use add_method_body to add implementation.',
+    description: `Create a method signature in a file. This only creates the method declaration, not the body. Use add_method_body to add implementation.
+
+Parameters are automatically created as clauses. The response includes the clause UUIDs for each parameter.
+
+Example request:
+{
+  "file": "file-uuid",
+  "name": "verify",
+  "visibility": "public",
+  "returnType": "object",
+  "nullable": true,
+  "parameters": [
+    { "name": "credentials", "datatype": "array" }
+  ]
+}
+
+Example response includes:
+{
+  "uuid": "method-uuid",
+  "name": "verify",
+  "returnType": "object",
+  "nullable": true,
+  "parameters": ["clause-uuid-for-credentials"],
+  ...
+}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -187,24 +225,36 @@ For Vue: Use type='js' and extension='vue'. Place in the 'js' directory.`,
         },
         returnType: {
           type: 'string',
-          description: 'Return type (e.g., "int", "string", "void")',
+          description: 'Return type (e.g., "int", "string", "void", "object")',
+        },
+        nullable: {
+          type: 'boolean',
+          description: 'Whether the return type is nullable (e.g., ?object)',
         },
         parameters: {
           type: 'array',
-          description: 'Array of method parameters',
+          description: 'Array of method parameters. Each parameter is created as a clause.',
           items: {
             type: 'object',
             properties: {
               name: {
                 type: 'string',
-                description: 'Parameter name',
+                description: 'Parameter name (e.g., "credentials", "id")',
+              },
+              datatype: {
+                type: 'string',
+                description: 'Parameter data type (e.g., "array", "int", "string", "Request")',
               },
               type: {
                 type: 'string',
-                description: 'Parameter type',
+                description: 'Clause type, defaults to "variable"',
+              },
+              value: {
+                type: 'string',
+                description: 'Parameter value, defaults to the name',
               },
             },
-            required: ['name', 'type'],
+            required: ['name'],
           },
         },
       },
@@ -778,20 +828,22 @@ IMPORTANT: This is a full replacement, not a partial update. To update an existi
 
 Required fields: uuid, name, type
 
+IMPORTANT - data vs statements:
+- 'data' array = METHOD UUIDs only (functions)
+- 'statements' array = STATEMENT UUIDs (imports, variables, refs - code outside methods)
+
 Vue SFC example:
   save_file({
     uuid: fileUuid,
     name: "Counter",
     type: "js",
     extension: "vue",
-    template: [rootElementUuid],  // From html_to_elements
-    data: [statementUuid, methodUuid]  // ALL <script setup> code
+    template: [rootElementUuid],      // From html_to_elements
+    data: [methodUuid],               // Method UUIDs only
+    statements: [importStmtUuid, refStmtUuid]  // Statement UUIDs (imports, refs)
   })
 
-The 'data' array is a FLAT array containing ALL UUIDs for <script setup> content:
-- Statement UUIDs (from create_statement) - variables, imports, reactive refs
-- Method UUIDs (from create_method) - functions
-Example: data: ["stmt-uuid-1", "method-uuid-1", "stmt-uuid-2"] (order matters!)`,
+For <script setup> content, the order in statements array determines output order.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -820,7 +872,12 @@ Example: data: ["stmt-uuid-1", "method-uuid-1", "stmt-uuid-2"] (order matters!)`
         data: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of ALL statement AND method UUIDs for <script setup> content',
+          description: 'Array of METHOD UUIDs only (functions created via create_method)',
+        },
+        statements: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of STATEMENT UUIDs (imports, variables, refs - created via create_statement)',
         },
         includes: {
           type: 'array',

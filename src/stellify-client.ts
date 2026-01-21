@@ -8,8 +8,11 @@ export interface StellifyConfig {
 export interface CreateFileParams {
   directory?: string; // UUID of directory, or omit to auto-detect from type
   name: string;
-  type: 'class' | 'model' | 'controller' | 'middleware';
+  type: 'class' | 'model' | 'controller' | 'middleware' | 'js';
   namespace?: string;
+  extension?: string;
+  code?: string; // Complete PHP code to analyze for dependencies
+  auto_create_dependencies?: boolean; // If true, create missing dependencies from code
 }
 
 export interface CreateMethodParams {
@@ -174,8 +177,10 @@ export class StellifyClient {
     return response.data;
   }
 
-  async deleteElement(uuid: string) {
-    const response = await this.client.delete(`/element/${uuid}`);
+  async deleteElement(uuid: string, page?: string, current?: string) {
+    const pageParam = page || 'null';
+    const currentParam = current || 'null';
+    const response = await this.client.delete(`/element/${pageParam}/${currentParam}/${uuid}`);
     return response.data;
   }
 
