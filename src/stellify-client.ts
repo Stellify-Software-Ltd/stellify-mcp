@@ -28,8 +28,8 @@ export interface CreateMethodParams {
 }
 
 export interface AddMethodBodyParams {
-  file_uuid: string;
-  method_uuid: string;
+  file: string;
+  method: string;
   code: string;
 }
 
@@ -97,7 +97,7 @@ export class StellifyClient {
     return response.data;
   }
 
-  async addStatementCode(params: { file_uuid: string; statement_uuid: string; code: string }) {
+  async addStatementCode(params: { file: string; statement: string; code: string }) {
     const response = await this.client.post('/code', params);
     return response.data;
   }
@@ -124,6 +124,11 @@ export class StellifyClient {
 
   async getMethod(uuid: string) {
     const response = await this.client.get(`/method/${uuid}`);
+    return response.data;
+  }
+
+  async saveMethod(uuid: string, data: any) {
+    const response = await this.client.put(`/method/${uuid}`, data);
     return response.data;
   }
 

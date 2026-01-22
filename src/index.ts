@@ -267,11 +267,11 @@ Example response includes:
     inputSchema: {
       type: 'object',
       properties: {
-        file_uuid: {
+        file: {
           type: 'string',
           description: 'UUID of the file containing the method',
         },
-        method_uuid: {
+        method: {
           type: 'string',
           description: 'UUID of the method to add code to',
         },
@@ -280,7 +280,56 @@ Example response includes:
           description: 'PHP code for the method body (just the statements, no function declaration). Example: "return $a + $b;"',
         },
       },
-      required: ['file_uuid', 'method_uuid', 'code'],
+      required: ['file', 'method', 'code'],
+    },
+  },
+  {
+    name: 'save_method',
+    description: `Update an existing method's properties (name, visibility, returnType, nullable, parameters).
+
+Use this to modify a method after creation. For updating the method body, use add_method_body instead.
+
+Example:
+{
+  "uuid": "method-uuid",
+  "returnType": "object",
+  "nullable": true
+}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the method to update',
+        },
+        name: {
+          type: 'string',
+          description: 'Method name',
+        },
+        visibility: {
+          type: 'string',
+          enum: ['public', 'protected', 'private'],
+          description: 'Method visibility (PHP only)',
+        },
+        is_static: {
+          type: 'boolean',
+          description: 'Whether the method is static (PHP only)',
+        },
+        returnType: {
+          type: 'string',
+          description: 'Return type (e.g., "int", "string", "void", "object")',
+        },
+        nullable: {
+          type: 'boolean',
+          description: 'Whether the return type is nullable',
+        },
+        parameters: {
+          type: 'array',
+          description: 'Array of parameter clause UUIDs',
+          items: { type: 'string' },
+        },
+      },
+      required: ['uuid'],
     },
   },
   {
@@ -799,11 +848,11 @@ Examples:
     inputSchema: {
       type: 'object',
       properties: {
-        file_uuid: {
+        file: {
           type: 'string',
           description: 'UUID of the file containing the statement',
         },
-        statement_uuid: {
+        statement: {
           type: 'string',
           description: 'UUID of the statement to add code to',
         },
@@ -812,7 +861,7 @@ Examples:
           description: 'The code to add (e.g., "const count = ref(0);")',
         },
       },
-      required: ['file_uuid', 'statement_uuid', 'code'],
+      required: ['file', 'statement', 'code'],
     },
   },
   {
@@ -1030,6 +1079,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 success: true,
                 message: `Created method "${(args as any).name}" (UUID: ${methodData.uuid})`,
                 method: methodData,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'save_method': {
+        const { uuid, ...data } = args as any;
+        const result = await stellify.saveMethod(uuid, { uuid, ...data });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Updated method "${uuid}"`,
+                method: result,
               }, null, 2),
             },
           ],
