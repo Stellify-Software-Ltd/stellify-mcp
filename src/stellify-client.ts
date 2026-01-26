@@ -35,7 +35,7 @@ export interface AddMethodBodyParams {
 
 export interface SearchMethodsParams {
   name?: string;
-  file_uuid?: string;
+  file?: string;
 }
 
 export interface SearchFilesParams {
@@ -112,23 +112,23 @@ export class StellifyClient {
     return response.data;
   }
 
-  async getFile(uuid: string) {
-    const response = await this.client.get(`/file/${uuid}`);
+  async getFile(file: string) {
+    const response = await this.client.get(`/file/${file}`);
     return response.data;
   }
 
-  async saveFile(uuid: string, data: any) {
-    const response = await this.client.put(`/file/${uuid}`, data);
+  async saveFile(file: string, data: any) {
+    const response = await this.client.put(`/file/${file}`, data);
     return response.data;
   }
 
-  async getMethod(uuid: string) {
-    const response = await this.client.get(`/method/${uuid}`);
+  async getMethod(method: string) {
+    const response = await this.client.get(`/method/${method}`);
     return response.data;
   }
 
-  async saveMethod(uuid: string, data: any) {
-    const response = await this.client.put(`/method/${uuid}`, data);
+  async saveMethod(method: string, data: any) {
+    const response = await this.client.put(`/method/${method}`, data);
     return response.data;
   }
 
@@ -137,13 +137,13 @@ export class StellifyClient {
     return response.data;
   }
 
-  async getStatement(uuid: string) {
-    const response = await this.client.get(`/statement/${uuid}`);
+  async getStatement(statement: string) {
+    const response = await this.client.get(`/statement/${statement}`);
     return response.data;
   }
 
-  async saveStatement(uuid: string, data: any) {
-    const response = await this.client.put(`/statement/${uuid}`, data);
+  async saveStatement(statement: string, data: any) {
+    const response = await this.client.put(`/statement/${statement}`, data);
     return response.data;
   }
 
@@ -152,8 +152,8 @@ export class StellifyClient {
     return response.data;
   }
 
-  async getRoute(uuid: string) {
-    const response = await this.client.get(`/route/${uuid}`);
+  async getRoute(route: string) {
+    const response = await this.client.get(`/route/${route}`);
     return response.data;
   }
 
@@ -167,25 +167,25 @@ export class StellifyClient {
     return response.data;
   }
 
-  async updateElement(uuid: string, data: any) {
-    const response = await this.client.put(`/element/${uuid}`, data);
+  async updateElement(element: string, data: any) {
+    const response = await this.client.put(`/element/${element}`, data);
     return response.data;
   }
 
-  async getElement(uuid: string) {
-    const response = await this.client.get(`/element/${uuid}`);
+  async getElement(element: string) {
+    const response = await this.client.get(`/element/${element}`);
     return response.data;
   }
 
-  async getElementTree(uuid: string) {
-    const response = await this.client.get(`/element/${uuid}/tree`);
+  async getElementTree(element: string) {
+    const response = await this.client.get(`/element/${element}/tree`);
     return response.data;
   }
 
-  async deleteElement(uuid: string, page?: string, current?: string) {
-    const pageParam = page || 'null';
+  async deleteElement(route: string, current?: string, element?: string) {
+    const routeParam = route || 'null';
     const currentParam = current || 'null';
-    const response = await this.client.delete(`/element/${pageParam}/${currentParam}/${uuid}`);
+    const response = await this.client.delete(`/element/${routeParam}/${currentParam}/${element}`);
     return response.data;
   }
 
@@ -236,8 +236,8 @@ export class StellifyClient {
     return response.data;
   }
 
-  async getModule(uuid: string) {
-    const response = await this.client.get(`/modules/${uuid}`);
+  async getModule(module: string) {
+    const response = await this.client.get(`/modules/${module}`);
     return response.data;
   }
 
@@ -246,29 +246,29 @@ export class StellifyClient {
     return response.data;
   }
 
-  async addFileToModule(params: { module_uuid: string; file_uuid: string; order?: number }) {
+  async addFileToModule(params: { module: string; file: string; order?: number }) {
     const response = await this.client.post('/modules/add-file', params);
     return response.data;
   }
 
-  async removeFileFromModule(moduleUuid: string, fileUuid: string) {
-    const response = await this.client.delete(`/modules/${moduleUuid}/file/${fileUuid}`);
+  async removeFileFromModule(module: string, file: string) {
+    const response = await this.client.delete(`/modules/${module}/file/${file}`);
     return response.data;
   }
 
-  async installModule(params: { module_uuid: string; directory_uuid: string }) {
+  async installModule(params: { module: string; directory: string }) {
     const response = await this.client.post('/modules/install', params);
     return response.data;
   }
 
   async deleteModule(uuid: string) {
-    const response = await this.client.delete(`/modules/${uuid}`);
+    const response = await this.client.delete(`/modules/${module}`);
     return response.data;
   }
 
   // Directory methods
   async getDirectory(uuid: string) {
-    const response = await this.client.get(`/directory/${uuid}`);
+    const response = await this.client.get(`/directory/${directory}`);
     return response.data;
   }
 
@@ -278,7 +278,7 @@ export class StellifyClient {
   }
 
   async saveDirectory(uuid: string, data: any) {
-    const response = await this.client.put(`/directory/${uuid}`, { uuid, data });
+    const response = await this.client.put(`/directory/${directory}`, { uuid, data });
     return response.data;
   }
 
