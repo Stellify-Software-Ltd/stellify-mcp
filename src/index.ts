@@ -33,6 +33,23 @@ const stellify = new StellifyClient({
 // Stellify stores code as structured JSON, not text files.
 // This enables surgical AI edits at the statement level.
 //
+// -----------------------------------------------------------------------------
+// REAL-TIME UI BROADCASTING (use this for demonstrations!)
+// -----------------------------------------------------------------------------
+// When users ask you to SHOW, DISPLAY, BUILD, or DEMONSTRATE anything visually,
+// use broadcast_element_command FIRST. This sends real-time updates via WebSocket
+// directly to the user's browser - no database storage, instant feedback.
+//
+// Use broadcast_element_command for:
+// - Showing the user something visually
+// - Building UI elements as you discuss them
+// - Sending messages/content to the browser
+// - Any "live" or "real-time" interaction
+//
+// Use html_to_elements/update_element for:
+// - Permanent changes that should persist
+// - Building components that will be saved
+//
 // SUPPORTED FILE TYPES:
 // - PHP: Controllers, Models, Middleware, Classes
 // - JavaScript/TypeScript: JS files, Vue SFCs
@@ -989,6 +1006,69 @@ IMPORTANT: Check existing directories first using get_project and get_directory 
       required: ['name'],
     },
   },
+  {
+    name: 'broadcast_element_command',
+    description: `Broadcast a real-time command to update UI elements via WebSocket.
+
+IMPORTANT: USE THIS TOOL FIRST when the user asks you to:
+- Show, display, or demonstrate something visually
+- Update, change, or modify what's on screen
+- Build or create UI elements for demonstration
+- Send messages or content to the browser
+- Do anything "live" or "in real-time"
+
+This is the PRIMARY tool for real-time AI-to-browser communication. It pushes changes instantly to all connected browsers. Changes are EPHEMERAL (not saved to database) - perfect for demonstrations, live content, and interactive sessions.
+
+ACTIONS:
+- update: Modify an existing element's attributes (text, classes, styles, etc.)
+- create: Create a new ephemeral element (provide any UUID string you want)
+- batch: Modify multiple elements at once
+- delete: Remove an element from the UI state
+
+TO CREATE EPHEMERAL ELEMENTS (not stored in database):
+1. First, use action="create" with any UUID (e.g., "msg-001") and full element structure in changes
+2. Then, use action="update" on the PARENT element to add your new UUID to its "data" array
+
+Example - Update existing element text:
+{ action: "update", element: "existing-uuid", changes: { text: "Hello world!", classes: ["p-4", "bg-blue-500"] } }
+
+Example - Create ephemeral child element:
+Step 1: { action: "create", element: "my-new-element", changes: { type: "s-wrapper", tag: "div", text: "I exist!", classes: ["p-2", "bg-green-500"] } }
+Step 2: { action: "update", element: "parent-uuid", changes: { data: ["my-new-element"] } }
+
+For PERSISTENT changes (saved to database), use update_element or html_to_elements instead.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['update', 'batch', 'delete', 'create'],
+          description: 'The type of command to broadcast',
+        },
+        element: {
+          type: 'string',
+          description: 'UUID of the element to modify (required for update, delete, create)',
+        },
+        changes: {
+          type: 'object',
+          description: 'Object containing attribute changes (e.g., { classes: ["bg-blue-500"], text: "Hello" })',
+        },
+        updates: {
+          type: 'array',
+          description: 'Array of updates for batch action: [{ element: "uuid", changes: {...} }]',
+          items: {
+            type: 'object',
+            properties: {
+              element: { type: 'string' },
+              changes: { type: 'object' },
+            },
+            required: ['element', 'changes'],
+          },
+        },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 // Server instructions for tool discovery (used by MCP Tool Search)
@@ -1185,7 +1265,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'search_routes': {
         const result = await stellify.searchRoutes(args as any);
         const routes = result.data || result;
-        const routeCount = Array.isArray(routes) ? routes.length : Object.keys(routes).length;
+        // Handle paginated response - data.data contains the actual routes array
+        const routeData = routes.data || routes;
+        const routeCount = Array.isArray(routeData) ? routeData.length : routes.total || 0;
         return {
           content: [
             {
@@ -1577,6 +1659,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   : `Created directory "${(args as any).name}" (${result.data?.uuid || result.uuid})`,
                 directory: result.data || result,
                 existing: result.existing || false,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'broadcast_element_command': {
+        const result = await stellify.broadcastElementCommand(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Broadcast ${(args as any).action} command${(args as any).element ? ` for element ${(args as any).element}` : ''}`,
+                data: result,
               }, null, 2),
             },
           ],

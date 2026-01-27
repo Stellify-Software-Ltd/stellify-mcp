@@ -268,7 +268,7 @@ export class StellifyClient {
 
   // Directory methods
   async getDirectory(uuid: string) {
-    const response = await this.client.get(`/directory/${directory}`);
+    const response = await this.client.get(`/directory/${uuid}`);
     return response.data;
   }
 
@@ -278,13 +278,24 @@ export class StellifyClient {
   }
 
   async saveDirectory(uuid: string, data: any) {
-    const response = await this.client.put(`/directory/${directory}`, { uuid, data });
+    const response = await this.client.put(`/directory/${uuid}`, { uuid, data });
     return response.data;
   }
 
   // Project methods
   async getProject() {
     const response = await this.client.get('/getProject');
+    return response.data;
+  }
+
+  // Element command broadcast (real-time UI updates via WebSocket)
+  async broadcastElementCommand(params: {
+    action: 'update' | 'batch' | 'delete' | 'create';
+    element?: string;
+    changes?: Record<string, any>;
+    updates?: Array<{ element: string; changes: Record<string, any> }>;
+  }) {
+    const response = await this.client.post('/elements/command', params);
     return response.data;
   }
 }
