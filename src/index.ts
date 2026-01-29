@@ -1069,6 +1069,88 @@ For PERSISTENT changes (saved to database), use update_element or html_to_elemen
       required: ['action'],
     },
   },
+  {
+    name: 'run_code',
+    description: `Execute code in the Stellify project environment and return the output.
+
+This tool allows you to run PHP or JavaScript code and see the results. Use this for:
+- Testing methods you've created
+- Verifying code behavior
+- Running artisan commands
+- Debugging issues
+- Getting real feedback on code execution
+
+EXECUTION MODES:
+
+1. Run a specific method by UUID:
+   { file: "file-uuid", method: "method-uuid", args: ["arg1", "arg2"] }
+
+2. Run arbitrary PHP code:
+   { code: "return 1 + 1;" }
+
+3. Run with benchmarking enabled:
+   { file: "file-uuid", method: "method-uuid", benchmark: true }
+
+EXAMPLES:
+
+Run a controller method:
+{
+  "file": "user-controller-uuid",
+  "method": "index-method-uuid",
+  "args": []
+}
+
+Execute inline PHP:
+{
+  "code": "return collect([1, 2, 3])->sum();"
+}
+
+Test with benchmark timing:
+{
+  "file": "file-uuid",
+  "method": "method-uuid",
+  "benchmark": true
+}
+
+RESPONSE includes:
+- output: The return value or printed output
+- success: Whether execution succeeded
+- error: Error message if failed
+- execution_time: Time taken (if benchmark enabled)
+- memory_usage: Memory used (if benchmark enabled)
+
+SECURITY: Code runs in a sandboxed environment with limited permissions.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          description: 'UUID of the file containing the method to run',
+        },
+        method: {
+          type: 'string',
+          description: 'UUID of the method to execute',
+        },
+        code: {
+          type: 'string',
+          description: 'Raw PHP/JS code to execute (alternative to file/method)',
+        },
+        args: {
+          type: 'array',
+          description: 'Arguments to pass to the method',
+          items: {},
+        },
+        timeout: {
+          type: 'number',
+          description: 'Execution timeout in seconds (default: 30, max: 60)',
+        },
+        benchmark: {
+          type: 'boolean',
+          description: 'Enable benchmarking to measure execution time and memory usage',
+        },
+      },
+    },
+  },
 ];
 
 // Server instructions for tool discovery (used by MCP Tool Search)
@@ -1675,6 +1757,30 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 success: true,
                 message: `Broadcast ${(args as any).action} command${(args as any).element ? ` for element ${(args as any).element}` : ''}`,
                 data: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'run_code': {
+        const result = await stellify.runCode(args as any);
+        const benchmarkInfo = (args as any).benchmark
+          ? ` (${result.execution_time || 'N/A'}ms, ${result.memory_usage || 'N/A'})`
+          : '';
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: result.success !== false,
+                message: result.success !== false
+                  ? `Code executed successfully${benchmarkInfo}`
+                  : `Execution failed: ${result.error || 'Unknown error'}`,
+                output: result.output,
+                error: result.error,
+                execution_time: result.execution_time,
+                memory_usage: result.memory_usage,
               }, null, 2),
             },
           ],

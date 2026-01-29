@@ -298,4 +298,17 @@ export class StellifyClient {
     const response = await this.client.post('/elements/command', params);
     return response.data;
   }
+
+  // Code execution
+  async runCode(params: {
+    file: string;
+    method: string;
+    args?: any[];
+    timeout?: number;
+    benchmark?: boolean;
+  }) {
+    const { file, method, ...body } = params;
+    const response = await this.client.put(`/code/${file}/${method}`, body);
+    return response.data;
+  }
 }
