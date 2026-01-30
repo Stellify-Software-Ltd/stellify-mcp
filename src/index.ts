@@ -372,7 +372,7 @@ Example:
     inputSchema: {
       type: 'object',
       properties: {
-        name: {
+        query: {
           type: 'string',
           description: 'File name pattern to search for',
         },

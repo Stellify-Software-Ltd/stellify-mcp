@@ -182,10 +182,8 @@ export class StellifyClient {
     return response.data;
   }
 
-  async deleteElement(route: string, current?: string, element?: string) {
-    const routeParam = route || 'null';
-    const currentParam = current || 'null';
-    const response = await this.client.delete(`/element/${routeParam}/${currentParam}/${element}`);
+  async deleteElement(uuid: string) {
+    const response = await this.client.delete(`/element/${uuid}`);
     return response.data;
   }
 
