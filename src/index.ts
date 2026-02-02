@@ -1071,41 +1071,26 @@ For PERSISTENT changes (saved to database), use update_element or html_to_elemen
   },
   {
     name: 'run_code',
-    description: `Execute code in the Stellify project environment and return the output.
+    description: `Execute a method in the Stellify project environment and return the output.
 
-This tool allows you to run PHP or JavaScript code and see the results. Use this for:
+This tool allows you to run methods you've created and see the results. Use this for:
 - Testing methods you've created
 - Verifying code behavior
-- Running artisan commands
 - Debugging issues
 - Getting real feedback on code execution
 
-EXECUTION MODES:
-
-1. Run a specific method by UUID:
-   { file: "file-uuid", method: "method-uuid", args: ["arg1", "arg2"] }
-
-2. Run arbitrary PHP code:
-   { code: "return 1 + 1;" }
-
-3. Run with benchmarking enabled:
-   { file: "file-uuid", method: "method-uuid", benchmark: true }
+REQUIRED: Both file and method UUIDs must be provided.
 
 EXAMPLES:
 
-Run a controller method:
+Run a method:
 {
-  "file": "user-controller-uuid",
-  "method": "index-method-uuid",
+  "file": "file-uuid",
+  "method": "method-uuid",
   "args": []
 }
 
-Execute inline PHP:
-{
-  "code": "return collect([1, 2, 3])->sum();"
-}
-
-Test with benchmark timing:
+Run with benchmarking enabled:
 {
   "file": "file-uuid",
   "method": "method-uuid",
@@ -1125,15 +1110,11 @@ SECURITY: Code runs in a sandboxed environment with limited permissions.`,
       properties: {
         file: {
           type: 'string',
-          description: 'UUID of the file containing the method to run',
+          description: 'UUID of the file containing the method to run (required)',
         },
         method: {
           type: 'string',
-          description: 'UUID of the method to execute',
-        },
-        code: {
-          type: 'string',
-          description: 'Raw PHP/JS code to execute (alternative to file/method)',
+          description: 'UUID of the method to execute (required)',
         },
         args: {
           type: 'array',
@@ -1149,6 +1130,7 @@ SECURITY: Code runs in a sandboxed environment with limited permissions.`,
           description: 'Enable benchmarking to measure execution time and memory usage',
         },
       },
+      required: ['file', 'method'],
     },
   },
 ];

@@ -297,7 +297,7 @@ export class StellifyClient {
     return response.data;
   }
 
-  // Code execution
+  // Code execution - runs a specific method by file and method UUID
   async runCode(params: {
     file: string;
     method: string;
@@ -306,6 +306,9 @@ export class StellifyClient {
     benchmark?: boolean;
   }) {
     const { file, method, ...body } = params;
+    if (!file || !method) {
+      throw new Error('Both file and method UUIDs are required to run code');
+    }
     const response = await this.client.put(`/code/${file}/${method}`, body);
     return response.data;
   }
