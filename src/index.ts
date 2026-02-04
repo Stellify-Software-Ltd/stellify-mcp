@@ -189,6 +189,10 @@ The system resolves these to UUIDs automatically, creating missing dependencies 
           items: { type: 'string' },
           description: 'Array of namespace strings to include as dependencies (e.g., ["App\\Models\\User", "Illuminate\\Support\\Facades\\Hash"]). These are resolved to UUIDs automatically.',
         },
+        module: {
+          type: 'string',
+          description: 'Optional module name to group this file with related code (e.g., "blog-posts", "user-auth"). Module is auto-created if it doesn\'t exist.',
+        },
       },
       required: ['directory', 'name', 'type'],
     },
@@ -416,6 +420,10 @@ Example:
         data: {
           type: 'object',
           description: 'Additional route data (title, description, element UUIDs)',
+        },
+        module: {
+          type: 'string',
+          description: 'Optional module name to group this route with related code (e.g., "blog-posts", "user-auth"). Module is auto-created if it doesn\'t exist.',
         },
       },
       required: ['project_id', 'name', 'path', 'method'],
@@ -663,60 +671,6 @@ IMPORTANT: Use the returned root element UUID in save_file's template array.`,
         },
       },
       required: ['elements'],
-    },
-  },
-  {
-    name: 'list_globals',
-    description: 'List all global files in the Application database. Globals are reusable, curated code (controllers, models, services) that can be installed into tenant projects.',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'get_global',
-    description: 'Get a global file with all its methods, statements, and clauses. Returns the full structure of a reusable code file.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        uuid: {
-          type: 'string',
-          description: 'UUID of the global file to retrieve',
-        },
-      },
-      required: ['uuid'],
-    },
-  },
-  {
-    name: 'install_global',
-    description: 'Install a global file from the Application database into a tenant project. Copies the file, methods, and statements to the tenant database with the same UUIDs (for deduplication). Clauses remain shared in the Application DB.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        file_uuid: {
-          type: 'string',
-          description: 'UUID of the global file to install',
-        },
-        directory_uuid: {
-          type: 'string',
-          description: 'UUID of the directory in the tenant project to install the file into',
-        },
-      },
-      required: ['file_uuid', 'directory_uuid'],
-    },
-  },
-  {
-    name: 'search_global_methods',
-    description: 'Search for methods across the Application database (global/framework methods). Use this to find reusable Laravel framework methods, facades, and shared code.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'Search query to find methods by name',
-        },
-      },
-      required: ['query'],
     },
   },
   // =============================================================================
@@ -1252,87 +1206,6 @@ Examples of capability requests:
       required: ['capability', 'description', 'use_case'],
     },
   },
-  // Project modules - organizational grouping for AI-created code
-  {
-    name: 'list_project_modules',
-    description: `List all modules in the current project.
-
-Modules group related files, routes, and elements together for organization.
-Example modules: "user-auth", "blog-posts", "product-catalog"
-
-Returns module names with counts of files/routes/elements in each.`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'create_project_module',
-    description: `Create a new module to group related code together.
-
-Use this BEFORE creating files for a feature. The module provides organizational grouping
-so users can see all code related to a feature (e.g., "blog-posts" contains PostController,
-Post model, post routes).
-
-If module already exists, returns the existing module (idempotent).
-
-IMPORTANT: When building a feature, ALWAYS create or use a module to group related files.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Module name in kebab-case (e.g., "blog-posts", "user-auth", "product-catalog")',
-        },
-        description: {
-          type: 'string',
-          description: 'Brief description of what this module contains',
-        },
-      },
-      required: ['name'],
-    },
-  },
-  {
-    name: 'add_file_to_module',
-    description: `Add a file to a project module.
-
-After creating a file with create_file, use this to associate it with a module.
-This helps organize code so users can see all files related to a feature.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        module: {
-          type: 'string',
-          description: 'Module UUID or name (e.g., "blog-posts")',
-        },
-        file_uuid: {
-          type: 'string',
-          description: 'UUID of the file to add',
-        },
-      },
-      required: ['module', 'file_uuid'],
-    },
-  },
-  {
-    name: 'add_route_to_module',
-    description: `Add a route/page to a project module.
-
-After creating a route with create_route, use this to associate it with a module.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        module: {
-          type: 'string',
-          description: 'Module UUID or name',
-        },
-        route_uuid: {
-          type: 'string',
-          description: 'UUID of the route to add',
-        },
-      },
-      required: ['module', 'route_uuid'],
-    },
-  },
 ];
 
 // Server instructions for tool discovery (used by MCP Tool Search)
@@ -1379,19 +1252,14 @@ Examples of capabilities (packages you cannot write):
 
 ## Project Modules (Code Organization)
 
-When building features, ALWAYS group related files into a module for organization.
+When building features, group related files by passing a "module" parameter.
 
-**WORKFLOW for creating features:**
+**WORKFLOW:** Simply include the 'module' parameter when creating files or routes:
 
-1. Create or get the module: create_project_module(name: "blog-posts", description: "Blog post management")
+- create_file(..., module: "blog-posts") - auto-groups file
+- create_route(..., module: "blog-posts") - auto-groups route
 
-2. Create files as normal: create_file(), create_method(), etc.
-
-3. Add each file to the module: add_file_to_module(module: "blog-posts", file_uuid: "...")
-
-4. If creating routes: add_route_to_module(module: "blog-posts", route_uuid: "...")
-
-This helps users see all code related to a feature grouped together.
+Modules are auto-created if they don't exist. This helps users see all code related to a feature grouped together.
 
 Example module names: "user-auth", "blog-posts", "product-catalog", "order-management", "admin-dashboard"`;
 
@@ -1709,70 +1577,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case 'list_globals': {
-        const result = await stellify.listGlobals();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                message: `Found ${result.data?.length || 0} globals`,
-                globals: result.data,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'get_global': {
-        const { uuid } = args as any;
-        const result = await stellify.getGlobal(uuid);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                global: result,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'install_global': {
-        const result = await stellify.installGlobal(args as any);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                message: `Installed global "${result.data?.file_name}" (${result.data?.methods_copied} methods, ${result.data?.statements_copied} statements)`,
-                data: result.data,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'search_global_methods': {
-        const result = await stellify.searchGlobalMethods(args as any);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                message: `Found ${result.data?.length || 0} global methods`,
-                methods: result.data,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
       // Statement & File Management handlers
       case 'get_statement': {
         const result = await stellify.getStatement((args as any).uuid);
@@ -2010,70 +1814,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 success: true,
                 message: `Capability request logged: "${(args as any).capability}"`,
                 request_id: result.data?.uuid || result.uuid,
-                data: result.data || result,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'list_project_modules': {
-        const result = await stellify.listProjectModules();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                message: 'Project modules retrieved',
-                modules: result.data || result,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'create_project_module': {
-        const result = await stellify.createProjectModule(args as any);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                message: result.message || 'Module created',
-                module: result.data || result,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'add_file_to_module': {
-        const result = await stellify.addFileToProjectModule(args as any);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                message: 'File added to module',
-                data: result.data || result,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'add_route_to_module': {
-        const result = await stellify.addRouteToProjectModule(args as any);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                message: 'Route added to module',
                 data: result.data || result,
               }, null, 2),
             },

@@ -207,27 +207,6 @@ export class StellifyClient {
     return response.data;
   }
 
-  // Global methods (Application DB)
-  async listGlobals() {
-    const response = await this.client.get('/globals/');
-    return response.data;
-  }
-
-  async getGlobal(uuid: string) {
-    const response = await this.client.get(`/globals/file/${uuid}`);
-    return response.data;
-  }
-
-  async installGlobal(params: { file_uuid: string; directory_uuid: string }) {
-    const response = await this.client.post('/globals/install', params);
-    return response.data;
-  }
-
-  async searchGlobalMethods(params: { query: string }) {
-    const response = await this.client.post('/method/search-global', params);
-    return response.data;
-  }
-
   // Directory methods
   async getDirectory(uuid: string) {
     const response = await this.client.get(`/directory/${uuid}`);
@@ -323,39 +302,4 @@ export class StellifyClient {
     return response.data;
   }
 
-  // Project modules - organizational grouping for AI-created code
-
-  async listProjectModules() {
-    const response = await this.client.get('/project-modules');
-    return response.data;
-  }
-
-  async getProjectModule(uuid: string) {
-    const response = await this.client.get(`/project-modules/${uuid}`);
-    return response.data;
-  }
-
-  async createProjectModule(params: {
-    name: string;
-    description?: string;
-  }) {
-    const response = await this.client.post('/project-modules', params);
-    return response.data;
-  }
-
-  async addFileToProjectModule(params: {
-    module: string; // UUID or name
-    file_uuid: string;
-  }) {
-    const response = await this.client.post('/project-modules/add-file', params);
-    return response.data;
-  }
-
-  async addRouteToProjectModule(params: {
-    module: string; // UUID or name
-    route_uuid: string;
-  }) {
-    const response = await this.client.post('/project-modules/add-route', params);
-    return response.data;
-  }
 }
