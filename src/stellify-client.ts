@@ -340,4 +340,22 @@ export class StellifyClient {
     const response = await this.client.put(`/code/${file}/${method}`, body);
     return response.data;
   }
+
+  // Framework capabilities - list what's available
+  async getCapabilities() {
+    const response = await this.client.get('/capabilities');
+    return response.data;
+  }
+
+  // Request a missing capability - logs to backlog
+  async requestCapability(params: {
+    capability: string;
+    description: string;
+    use_case: string;
+    workaround?: string;
+    priority?: 'low' | 'medium' | 'high' | 'critical';
+  }) {
+    const response = await this.client.post('/capabilities/request', params);
+    return response.data;
+  }
 }

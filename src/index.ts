@@ -1281,6 +1281,67 @@ SECURITY: Code runs in a sandboxed environment with limited permissions.`,
       required: ['file', 'method'],
     },
   },
+  {
+    name: 'get_capabilities',
+    description: `List available system-level capabilities in the Stellify framework.
+
+Returns what's currently available for:
+- Authentication (Sanctum, session, etc.)
+- File storage (local, S3, etc.)
+- Email/notifications
+- Queues/jobs
+- Caching
+- Other installed packages and services
+
+Use this BEFORE attempting to build features that might require system capabilities.
+If a capability you need is not listed, use request_capability to log it.`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'request_capability',
+    description: `Log a missing system-level capability request.
+
+Use this when you encounter a user requirement that needs framework-level functionality
+that doesn't exist in Stellify. This creates a ticket in the Stellify backlog.
+
+DO NOT try to build system capabilities yourself - log them here instead.
+
+Examples of capability requests:
+- "Need WebSocket support for real-time chat"
+- "Need S3 file upload with signed URLs"
+- "Need scheduled task runner for daily reports"
+- "Need OAuth2 social login (Google, GitHub)"`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        capability: {
+          type: 'string',
+          description: 'Short name for the capability (e.g., "websocket-support", "s3-uploads", "social-oauth")',
+        },
+        description: {
+          type: 'string',
+          description: 'Detailed description of what capability is needed',
+        },
+        use_case: {
+          type: 'string',
+          description: 'The user requirement that triggered this request',
+        },
+        workaround: {
+          type: 'string',
+          description: 'Any temporary workaround, or "blocked" if none exists',
+        },
+        priority: {
+          type: 'string',
+          enum: ['low', 'medium', 'high', 'critical'],
+          description: 'Suggested priority based on user need (default: medium)',
+        },
+      },
+      required: ['capability', 'description', 'use_case'],
+    },
+  },
 ];
 
 // Server instructions for tool discovery (used by MCP Tool Search)
@@ -1296,7 +1357,34 @@ Key concepts:
 - Code is stored as structured JSON, enabling surgical AI edits at the statement level
 - Files contain methods and statements (code outside methods)
 - Vue components link to UI elements via the 'template' field
-- Event handlers (click, submit) wire UI elements to methods by UUID`;
+- Event handlers (click, submit) wire UI elements to methods by UUID
+
+## Framework Capabilities (Libraries/Packages)
+
+**CRITICAL: You write BUSINESS LOGIC only. Capabilities are installed packages/libraries (Sanctum, Stripe, AWS SDK, etc.) that Stellify provides. You CANNOT create these by writing code.**
+
+Examples of capabilities (packages you cannot write):
+- Authentication: laravel/sanctum, laravel/socialite
+- Payments: stripe/stripe-php
+- Storage: aws/aws-sdk-php, league/flysystem-aws-s3-v3
+- Email: mailgun/mailgun-php, aws/aws-sdk-php (SES)
+- Search: meilisearch/meilisearch-php, algolia/algoliasearch-client-php
+- WebSocket: laravel/reverb
+
+**WORKFLOW:**
+
+1. When a user requests functionality that might need a package/library, call get_capabilities() FIRST.
+
+2. If status is "available" → package is installed, proceed with business logic.
+
+3. If status is "needs_config" → package installed but needs API keys. INFORM THE USER to configure it in Project Settings.
+
+4. If status is "not_available" or doesn't exist:
+   - STOP IMMEDIATELY
+   - Call request_capability() to log it
+   - INFORM THE USER: "This feature requires the [X] package which isn't installed in Stellify yet. I've logged a request. This cannot be built until the package is added."
+
+**NEVER write code that belongs in a package.** If you find yourself writing OAuth flows, payment processing, S3 clients, email transport, search indexing, or similar infrastructure - STOP. That's a capability request, not business logic.`;
 
 // Create MCP server
 const server = new Server(
@@ -1963,6 +2051,39 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 error: result.error,
                 execution_time: result.execution_time,
                 memory_usage: result.memory_usage,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_capabilities': {
+        const result = await stellify.getCapabilities();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: 'Available framework capabilities',
+                capabilities: result.data || result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'request_capability': {
+        const result = await stellify.requestCapability(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Capability request logged: "${(args as any).capability}"`,
+                request_id: result.data?.uuid || result.uuid,
+                data: result.data || result,
               }, null, 2),
             },
           ],
