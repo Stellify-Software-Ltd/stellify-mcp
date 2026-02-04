@@ -719,96 +719,6 @@ IMPORTANT: Use the returned root element UUID in save_file's template array.`,
       required: ['query'],
     },
   },
-  // Module tools (groups of globals)
-  {
-    name: 'list_modules',
-    description: 'List all available modules. A module is a named collection of related global files that can be installed together as a package.',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
-    name: 'get_module',
-    description: 'Get a module with all its files. Returns the module metadata and list of global files it contains, in installation order.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        uuid: {
-          type: 'string',
-          description: 'UUID of the module to retrieve',
-        },
-      },
-      required: ['uuid'],
-    },
-  },
-  {
-    name: 'create_module',
-    description: 'Create a new module to group related global files together.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Unique name for the module (e.g., "laravel-sanctum-auth")',
-        },
-        description: {
-          type: 'string',
-          description: 'Description of what the module provides',
-        },
-        version: {
-          type: 'string',
-          description: 'Version string (default: "1.0.0")',
-        },
-        tags: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Tags for categorization (e.g., ["auth", "api", "sanctum"])',
-        },
-      },
-      required: ['name'],
-    },
-  },
-  {
-    name: 'add_file_to_module',
-    description: 'Add a global file to a module. Files are installed in order when the module is installed.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        module_uuid: {
-          type: 'string',
-          description: 'UUID of the module',
-        },
-        file_uuid: {
-          type: 'string',
-          description: 'UUID of the global file to add',
-        },
-        order: {
-          type: 'number',
-          description: 'Installation order (optional, auto-increments if not specified)',
-        },
-      },
-      required: ['module_uuid', 'file_uuid'],
-    },
-  },
-  {
-    name: 'install_module',
-    description: 'Install all files from a module into a tenant project. Copies files, methods, and statements in the defined order. Clauses remain shared in the Application DB.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        module_uuid: {
-          type: 'string',
-          description: 'UUID of the module to install',
-        },
-        directory_uuid: {
-          type: 'string',
-          description: 'UUID of the directory in the tenant project to install files into',
-        },
-      },
-      required: ['module_uuid', 'directory_uuid'],
-    },
-  },
   // =============================================================================
   // STATEMENT & FILE MANAGEMENT TOOLS
   // =============================================================================
@@ -1342,6 +1252,87 @@ Examples of capability requests:
       required: ['capability', 'description', 'use_case'],
     },
   },
+  // Project modules - organizational grouping for AI-created code
+  {
+    name: 'list_project_modules',
+    description: `List all modules in the current project.
+
+Modules group related files, routes, and elements together for organization.
+Example modules: "user-auth", "blog-posts", "product-catalog"
+
+Returns module names with counts of files/routes/elements in each.`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'create_project_module',
+    description: `Create a new module to group related code together.
+
+Use this BEFORE creating files for a feature. The module provides organizational grouping
+so users can see all code related to a feature (e.g., "blog-posts" contains PostController,
+Post model, post routes).
+
+If module already exists, returns the existing module (idempotent).
+
+IMPORTANT: When building a feature, ALWAYS create or use a module to group related files.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Module name in kebab-case (e.g., "blog-posts", "user-auth", "product-catalog")',
+        },
+        description: {
+          type: 'string',
+          description: 'Brief description of what this module contains',
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'add_file_to_module',
+    description: `Add a file to a project module.
+
+After creating a file with create_file, use this to associate it with a module.
+This helps organize code so users can see all files related to a feature.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        module: {
+          type: 'string',
+          description: 'Module UUID or name (e.g., "blog-posts")',
+        },
+        file_uuid: {
+          type: 'string',
+          description: 'UUID of the file to add',
+        },
+      },
+      required: ['module', 'file_uuid'],
+    },
+  },
+  {
+    name: 'add_route_to_module',
+    description: `Add a route/page to a project module.
+
+After creating a route with create_route, use this to associate it with a module.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        module: {
+          type: 'string',
+          description: 'Module UUID or name',
+        },
+        route_uuid: {
+          type: 'string',
+          description: 'UUID of the route to add',
+        },
+      },
+      required: ['module', 'route_uuid'],
+    },
+  },
 ];
 
 // Server instructions for tool discovery (used by MCP Tool Search)
@@ -1384,7 +1375,25 @@ Examples of capabilities (packages you cannot write):
    - Call request_capability() to log it
    - INFORM THE USER: "This feature requires the [X] package which isn't installed in Stellify yet. I've logged a request. This cannot be built until the package is added."
 
-**NEVER write code that belongs in a package.** If you find yourself writing OAuth flows, payment processing, S3 clients, email transport, search indexing, or similar infrastructure - STOP. That's a capability request, not business logic.`;
+**NEVER write code that belongs in a package.** If you find yourself writing OAuth flows, payment processing, S3 clients, email transport, search indexing, or similar infrastructure - STOP. That's a capability request, not business logic.
+
+## Project Modules (Code Organization)
+
+When building features, ALWAYS group related files into a module for organization.
+
+**WORKFLOW for creating features:**
+
+1. Create or get the module: create_project_module(name: "blog-posts", description: "Blog post management")
+
+2. Create files as normal: create_file(), create_method(), etc.
+
+3. Add each file to the module: add_file_to_module(module: "blog-posts", file_uuid: "...")
+
+4. If creating routes: add_route_to_module(module: "blog-posts", route_uuid: "...")
+
+This helps users see all code related to a feature grouped together.
+
+Example module names: "user-auth", "blog-posts", "product-catalog", "order-management", "admin-dashboard"`;
 
 // Create MCP server
 const server = new Server(
@@ -1764,88 +1773,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      // Module handlers
-      case 'list_modules': {
-        const result = await stellify.listModules();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                message: `Found ${result.data?.length || 0} modules`,
-                modules: result.data,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'get_module': {
-        const { uuid } = args as any;
-        const result = await stellify.getModule(uuid);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                module: result.module,
-                files: result.files,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'create_module': {
-        const result = await stellify.createModule(args as any);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                message: `Created module "${result.data?.name}"`,
-                data: result.data,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'add_file_to_module': {
-        const result = await stellify.addFileToModule(args as any);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                message: `Added "${result.data?.file_name}" to module (order: ${result.data?.order})`,
-                data: result.data,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'install_module': {
-        const result = await stellify.installModule(args as any);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                message: `Installed module "${result.data?.module_name}" (${result.data?.files_installed} files, ${result.data?.methods_copied} methods, ${result.data?.statements_copied} statements)`,
-                data: result.data,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
       // Statement & File Management handlers
       case 'get_statement': {
         const result = await stellify.getStatement((args as any).uuid);
@@ -2083,6 +2010,70 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 success: true,
                 message: `Capability request logged: "${(args as any).capability}"`,
                 request_id: result.data?.uuid || result.uuid,
+                data: result.data || result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'list_project_modules': {
+        const result = await stellify.listProjectModules();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: 'Project modules retrieved',
+                modules: result.data || result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'create_project_module': {
+        const result = await stellify.createProjectModule(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: result.message || 'Module created',
+                module: result.data || result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'add_file_to_module': {
+        const result = await stellify.addFileToProjectModule(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: 'File added to module',
+                data: result.data || result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'add_route_to_module': {
+        const result = await stellify.addRouteToProjectModule(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: 'Route added to module',
                 data: result.data || result,
               }, null, 2),
             },

@@ -228,42 +228,6 @@ export class StellifyClient {
     return response.data;
   }
 
-  // Module methods (groups of globals)
-  async listModules() {
-    const response = await this.client.get('/modules/');
-    return response.data;
-  }
-
-  async getModule(module: string) {
-    const response = await this.client.get(`/modules/${module}`);
-    return response.data;
-  }
-
-  async createModule(params: { name: string; description?: string; version?: string; tags?: string[] }) {
-    const response = await this.client.post('/modules/', params);
-    return response.data;
-  }
-
-  async addFileToModule(params: { module: string; file: string; order?: number }) {
-    const response = await this.client.post('/modules/add-file', params);
-    return response.data;
-  }
-
-  async removeFileFromModule(module: string, file: string) {
-    const response = await this.client.delete(`/modules/${module}/file/${file}`);
-    return response.data;
-  }
-
-  async installModule(params: { module: string; directory: string }) {
-    const response = await this.client.post('/modules/install', params);
-    return response.data;
-  }
-
-  async deleteModule(uuid: string) {
-    const response = await this.client.delete(`/modules/${module}`);
-    return response.data;
-  }
-
   // Directory methods
   async getDirectory(uuid: string) {
     const response = await this.client.get(`/directory/${uuid}`);
@@ -356,6 +320,42 @@ export class StellifyClient {
     priority?: 'low' | 'medium' | 'high' | 'critical';
   }) {
     const response = await this.client.post('/capabilities/request', params);
+    return response.data;
+  }
+
+  // Project modules - organizational grouping for AI-created code
+
+  async listProjectModules() {
+    const response = await this.client.get('/project-modules');
+    return response.data;
+  }
+
+  async getProjectModule(uuid: string) {
+    const response = await this.client.get(`/project-modules/${uuid}`);
+    return response.data;
+  }
+
+  async createProjectModule(params: {
+    name: string;
+    description?: string;
+  }) {
+    const response = await this.client.post('/project-modules', params);
+    return response.data;
+  }
+
+  async addFileToProjectModule(params: {
+    module: string; // UUID or name
+    file_uuid: string;
+  }) {
+    const response = await this.client.post('/project-modules/add-file', params);
+    return response.data;
+  }
+
+  async addRouteToProjectModule(params: {
+    module: string; // UUID or name
+    route_uuid: string;
+  }) {
+    const response = await this.client.post('/project-modules/add-route', params);
     return response.data;
   }
 }
