@@ -297,6 +297,34 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Resource scaffolding - create Model, Controller, Service, Migration in one call
+  async createResources(params: {
+    name: string;
+    fields?: Array<{
+      name: string;
+      type?: string;
+      nullable?: boolean;
+      unique?: boolean;
+      required?: boolean;
+      default?: any;
+      max?: number;
+    }>;
+    relationships?: Array<{
+      type: 'hasOne' | 'hasMany' | 'belongsTo' | 'belongsToMany';
+      model: string;
+      name?: string;
+    }>;
+    controller?: boolean;
+    service?: boolean;
+    migration?: boolean;
+    routes?: boolean;
+    soft_deletes?: boolean;
+    api?: boolean;
+  }) {
+    const response = await this.client.post('/resources', params);
+    return response.data;
+  }
+
   // Code execution - runs a specific method by file and method UUID
   async runCode(params: {
     file: string;

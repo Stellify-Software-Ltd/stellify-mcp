@@ -1070,6 +1070,154 @@ For PERSISTENT changes (saved to database), use update_element or html_to_elemen
     },
   },
   {
+    name: 'create_resources',
+    description: `Scaffold a complete resource stack in ONE operation. Creates Model, Controller, Service, and Migration together.
+
+This is the FASTEST way to bootstrap new features! Instead of 20+ individual API calls, create everything at once.
+
+WHAT IT CREATES:
+- Model: With $fillable, $casts, and relationship methods
+- Controller: With index, store, show, update, destroy actions
+- Service (optional): Business logic layer with list, find, create, update, delete methods
+- Migration: With proper column types based on field definitions
+
+EXAMPLE - Create a User resource:
+{
+  "name": "User",
+  "fields": [
+    { "name": "name", "type": "string" },
+    { "name": "email", "type": "string", "unique": true },
+    { "name": "password", "type": "string" },
+    { "name": "is_active", "type": "boolean", "default": true }
+  ],
+  "relationships": [
+    { "type": "hasMany", "model": "Post" }
+  ],
+  "controller": true,
+  "service": true,
+  "migration": true
+}
+
+FIELD TYPES:
+- string, text, longtext (text fields)
+- integer, int, bigint (numbers)
+- boolean, bool (true/false)
+- float, double, decimal (decimals)
+- date, datetime, timestamp (dates)
+- json (JSON/array data)
+- email (string with email validation)
+
+FIELD OPTIONS:
+- nullable: Allow NULL values
+- unique: Add unique constraint
+- required: Require in validation (default: true for store)
+- default: Default value
+- max: Maximum length/value
+
+RELATIONSHIP TYPES:
+- hasOne: One-to-one (User hasOne Profile)
+- hasMany: One-to-many (User hasMany Posts)
+- belongsTo: Inverse of hasOne/hasMany (Post belongsTo User)
+- belongsToMany: Many-to-many (User belongsToMany Roles)
+
+Returns UUIDs for all created files so you can customize them further if needed.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Resource name in PascalCase (e.g., "User", "BlogPost", "OrderItem")',
+        },
+        fields: {
+          type: 'array',
+          description: 'Array of field definitions for the model and migration',
+          items: {
+            type: 'object',
+            properties: {
+              name: {
+                type: 'string',
+                description: 'Field name in snake_case (e.g., "first_name", "is_active")',
+              },
+              type: {
+                type: 'string',
+                enum: ['string', 'integer', 'int', 'bigint', 'boolean', 'bool', 'float', 'double', 'decimal', 'date', 'datetime', 'timestamp', 'text', 'longtext', 'json', 'email'],
+                description: 'Field data type',
+              },
+              nullable: {
+                type: 'boolean',
+                description: 'Allow NULL values (default: false)',
+              },
+              unique: {
+                type: 'boolean',
+                description: 'Add unique constraint (default: false)',
+              },
+              required: {
+                type: 'boolean',
+                description: 'Require in validation for store action (default: true)',
+              },
+              default: {
+                description: 'Default value for the field',
+              },
+              max: {
+                type: 'integer',
+                description: 'Maximum length/value for validation',
+              },
+            },
+            required: ['name'],
+          },
+        },
+        relationships: {
+          type: 'array',
+          description: 'Array of relationship definitions',
+          items: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['hasOne', 'hasMany', 'belongsTo', 'belongsToMany'],
+                description: 'Relationship type',
+              },
+              model: {
+                type: 'string',
+                description: 'Related model name in PascalCase',
+              },
+              name: {
+                type: 'string',
+                description: 'Custom method name (defaults to camelCase of model)',
+              },
+            },
+            required: ['type', 'model'],
+          },
+        },
+        controller: {
+          type: 'boolean',
+          description: 'Create controller with CRUD actions (default: true)',
+        },
+        service: {
+          type: 'boolean',
+          description: 'Create service class for business logic (default: false)',
+        },
+        migration: {
+          type: 'boolean',
+          description: 'Create database migration (default: true)',
+        },
+        routes: {
+          type: 'boolean',
+          description: 'Create API routes (default: true)',
+        },
+        soft_deletes: {
+          type: 'boolean',
+          description: 'Add soft delete support to model and migration (default: false)',
+        },
+        api: {
+          type: 'boolean',
+          description: 'Generate API-style responses (default: true)',
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
     name: 'run_code',
     description: `Execute a method in the Stellify project environment and return the output.
 
@@ -1739,6 +1887,58 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 success: true,
                 message: `Broadcast ${(args as any).action} command${(args as any).element ? ` for element ${(args as any).element}` : ''}`,
                 data: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'create_resources': {
+        const result = await stellify.createResources(args as any);
+        const data = result.data || result;
+        const stats = data.statistics || {};
+
+        // Build summary of what was created
+        const created = [];
+        if (data.model) created.push(`Model (${data.model.uuid})`);
+        if (data.controller) created.push(`Controller (${data.controller.uuid})`);
+        if (data.service) created.push(`Service (${data.service.uuid})`);
+        if (data.migration) created.push(`Migration (${data.migration.uuid})`);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Created ${(args as any).name} resource: ${created.join(', ')} (${stats.files || 0} files, ${stats.methods || 0} methods)`,
+                data: {
+                  name: data.name,
+                  model: data.model ? {
+                    uuid: data.model.uuid,
+                    name: data.model.name,
+                    namespace: data.model.namespace,
+                    methods: data.model.methods,
+                  } : null,
+                  controller: data.controller ? {
+                    uuid: data.controller.uuid,
+                    name: data.controller.name,
+                    namespace: data.controller.namespace,
+                    methods: data.controller.methods,
+                  } : null,
+                  service: data.service ? {
+                    uuid: data.service.uuid,
+                    name: data.service.name,
+                    namespace: data.service.namespace,
+                    methods: data.service.methods,
+                  } : null,
+                  migration: data.migration ? {
+                    uuid: data.migration.uuid,
+                    name: data.migration.name,
+                    table: data.migration.table,
+                  } : null,
+                  statistics: stats,
+                },
               }, null, 2),
             },
           ],
