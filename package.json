@@ -1,6 +1,6 @@
 {
   "name": "@stellisoft/stellify-mcp",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "mcpName": "io.github.MattStellisoft/stellify-mcp",
   "description": "MCP server for Stellify - AI-native code generation platform",
   "main": "dist/index.js",
