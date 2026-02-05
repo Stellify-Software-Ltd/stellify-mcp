@@ -327,4 +327,22 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Code quality analysis - analyze Laravel structure for issues
+  async analyzeQuality(params: {
+    type?: 'full' | 'relationships' | 'fillables' | 'casts' | 'routes';
+  }) {
+    const type = params.type || 'full';
+
+    // Map type to endpoint
+    const endpoint = type === 'full' ? '/quality/analyze' :
+                     type === 'relationships' ? '/quality/relationships' :
+                     type === 'fillables' ? '/quality/fillables' :
+                     type === 'casts' ? '/quality/casts' :
+                     type === 'routes' ? '/quality/routes' :
+                     '/quality/analyze';
+
+    const response = await this.client.get(endpoint);
+    return response.data;
+  }
+
 }

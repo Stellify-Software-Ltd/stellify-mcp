@@ -1254,6 +1254,45 @@ The response includes actionable recommendations like:
       },
     },
   },
+  {
+    name: 'analyze_quality',
+    description: `Analyze Laravel code structure for quality issues. Detects missing relationships, fillables, casts, and route problems.
+
+Use this tool PROACTIVELY to:
+- Review code quality after creating models or controllers
+- Detect missing Eloquent relationships (belongsTo, hasMany)
+- Find migration fields not in $fillable
+- Suggest type casts for columns (json → array, datetime → datetime)
+- Identify broken route bindings (orphaned methods, missing controllers)
+
+ANALYSIS TYPES:
+- full: Comprehensive analysis of all categories with recommendations
+- relationships: Missing belongsTo/hasMany based on foreign keys
+- fillables: Migration fields not in Model $fillable array
+- casts: Columns that should have type casts
+- routes: Orphaned controller methods, routes pointing to missing methods
+
+EXAMPLE - Full analysis:
+{ "type": "full" }
+
+EXAMPLE - Check relationships only:
+{ "type": "relationships" }
+
+The response includes actionable suggestions like:
+- "Add belongsTo relationship: public function user() { return $this->belongsTo(User::class); }"
+- "Add 'published_at' to $fillable array"
+- "Add cast: 'metadata' => 'array'"`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: {
+          type: 'string',
+          enum: ['full', 'relationships', 'fillables', 'casts', 'routes'],
+          description: 'Type of analysis to run (default: full)',
+        },
+      },
+    },
+  },
 ];
 
 // Server instructions for tool discovery (used by MCP Tool Search)
@@ -1896,6 +1935,42 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         } else if (analysisType === 'trend') {
           const trend = data.trend || data;
           message = `Performance trend: ${Array.isArray(trend) ? trend.length : 0} days of data`;
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message,
+                analysis_type: analysisType,
+                data,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'analyze_quality': {
+        const result = await stellify.analyzeQuality(args as any);
+        const data = result.data || result;
+        const analysisType = (args as any).type || 'full';
+
+        // Build message based on analysis type
+        let message = '';
+        const issues = data.issues || [];
+
+        if (analysisType === 'full') {
+          const summary = data.summary || {};
+          message = `Analyzed ${summary.models_analyzed || 0} models, ${summary.controllers_analyzed || 0} controllers`;
+          if (summary.total_issues > 0) {
+            message += ` - Found ${summary.total_issues} issue(s): ${summary.high_severity || 0} high, ${summary.medium_severity || 0} medium, ${summary.low_severity || 0} low`;
+          } else {
+            message += ' - No issues found';
+          }
+        } else {
+          message = `Found ${issues.length} ${analysisType} issue(s)`;
         }
 
         return {
