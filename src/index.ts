@@ -1206,6 +1206,54 @@ Examples of capability requests:
       required: ['capability', 'description', 'use_case'],
     },
   },
+  {
+    name: 'analyze_performance',
+    description: `Analyze code execution performance from logs. Identifies slow methods, N+1 query patterns, high memory usage, and failure rates.
+
+Use this tool PROACTIVELY to:
+- Review performance after creating new methods
+- Identify optimization opportunities
+- Detect N+1 query patterns (high query counts)
+- Find methods that need caching or refactoring
+- Check failure rates and error patterns
+
+ANALYSIS TYPES:
+- full: Comprehensive report with all issues, recommendations, and statistics
+- slow_methods: Methods exceeding 500ms execution time
+- high_query_methods: Methods with >10 queries (potential N+1 problems)
+- high_memory_methods: Methods using >50MB memory
+- failure_rates: Methods with high error rates
+- trend: Performance trend over time (daily averages)
+
+EXAMPLE - Full analysis:
+{ "type": "full", "days": 7 }
+
+EXAMPLE - Check for N+1 queries:
+{ "type": "high_query_methods", "limit": 10 }
+
+The response includes actionable recommendations like:
+- "Consider eager loading relationships" for N+1 patterns
+- "Add database indexes" for slow queries
+- "Use chunking" for high memory usage`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: {
+          type: 'string',
+          enum: ['full', 'slow_methods', 'high_query_methods', 'high_memory_methods', 'failure_rates', 'trend'],
+          description: 'Type of analysis to run (default: full)',
+        },
+        days: {
+          type: 'number',
+          description: 'Number of days to analyze (default: 7)',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum results for specific queries (default: 10)',
+        },
+      },
+    },
+  },
 ];
 
 // Server instructions for tool discovery (used by MCP Tool Search)
@@ -1815,6 +1863,50 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 message: `Capability request logged: "${(args as any).capability}"`,
                 request_id: result.data?.uuid || result.uuid,
                 data: result.data || result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'analyze_performance': {
+        const result = await stellify.analyzePerformance(args as any);
+        const data = result.data || result;
+        const analysisType = (args as any).type || 'full';
+
+        // Build message based on analysis type
+        let message = '';
+        if (analysisType === 'full') {
+          message = data.summary || `Analyzed ${data.analyzed_executions || 0} executions`;
+          if (data.issues?.length > 0) {
+            message += ` - Found ${data.issues.length} potential issue(s)`;
+          }
+        } else if (analysisType === 'slow_methods') {
+          const methods = data.slow_methods || data;
+          message = `Found ${Array.isArray(methods) ? methods.length : 0} slow methods`;
+        } else if (analysisType === 'high_query_methods') {
+          const methods = data.high_query_methods || data;
+          message = `Found ${Array.isArray(methods) ? methods.length : 0} methods with high query counts (potential N+1)`;
+        } else if (analysisType === 'high_memory_methods') {
+          const methods = data.high_memory_methods || data;
+          message = `Found ${Array.isArray(methods) ? methods.length : 0} methods with high memory usage`;
+        } else if (analysisType === 'failure_rates') {
+          const methods = data.failure_rates || data;
+          message = `Found ${Array.isArray(methods) ? methods.length : 0} methods with failures`;
+        } else if (analysisType === 'trend') {
+          const trend = data.trend || data;
+          message = `Performance trend: ${Array.isArray(trend) ? trend.length : 0} days of data`;
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message,
+                analysis_type: analysisType,
+                data,
               }, null, 2),
             },
           ],

@@ -302,4 +302,29 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Performance analysis - analyze execution logs for optimization opportunities
+  async analyzePerformance(params: {
+    type?: 'full' | 'slow_methods' | 'high_query_methods' | 'high_memory_methods' | 'failure_rates' | 'trend';
+    days?: number;
+    limit?: number;
+  }) {
+    const type = params.type || 'full';
+    const queryParams: Record<string, any> = {};
+
+    if (params.days) queryParams.days = params.days;
+    if (params.limit) queryParams.limit = params.limit;
+
+    // Map type to endpoint
+    const endpoint = type === 'full' ? '/performance/analyze' :
+                     type === 'slow_methods' ? '/performance/slow-methods' :
+                     type === 'high_query_methods' ? '/performance/high-query-methods' :
+                     type === 'high_memory_methods' ? '/performance/high-memory-methods' :
+                     type === 'failure_rates' ? '/performance/failure-rates' :
+                     type === 'trend' ? '/performance/trend' :
+                     '/performance/analyze';
+
+    const response = await this.client.get(endpoint, { params: queryParams });
+    return response.data;
+  }
+
 }
