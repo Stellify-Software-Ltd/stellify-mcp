@@ -1146,25 +1146,6 @@ SECURITY: Code runs in a sandboxed environment with limited permissions.`,
     },
   },
   {
-    name: 'get_capabilities',
-    description: `List available system-level capabilities in the Stellify framework.
-
-Returns what's currently available for:
-- Authentication (Sanctum, session, etc.)
-- File storage (local, S3, etc.)
-- Email/notifications
-- Queues/jobs
-- Caching
-- Other installed packages and services
-
-Use this BEFORE attempting to build features that might require system capabilities.
-If a capability you need is not listed, use request_capability to log it.`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
     name: 'request_capability',
     description: `Log a missing system-level capability request.
 
@@ -1324,7 +1305,7 @@ Examples of capabilities (packages you cannot write):
 
 **WORKFLOW:**
 
-1. When a user requests functionality that might need a package/library, call get_capabilities() FIRST.
+1. When a user requests functionality that might need a package/library, check the capabilities list from get_project FIRST.
 
 2. If status is "available" → package is installed, proceed with business logic.
 
@@ -1381,14 +1362,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case 'get_project': {
         const result = await stellify.getProject();
+        const projectData = result.data || result;
+        const projectMeta = projectData.project || {};
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify({
                 success: true,
-                message: `Active project: "${result.data?.name || result.name}" (${result.data?.uuid || result.uuid})`,
-                project: result.data || result,
+                message: `Active project: "${projectMeta.name || 'unknown'}" (${projectMeta.uuid || 'unknown'})`,
+                project: projectData,
               }, null, 2),
             },
           ],
@@ -1869,22 +1852,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 error: result.error,
                 execution_time: result.execution_time,
                 memory_usage: result.memory_usage,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'get_capabilities': {
-        const result = await stellify.getCapabilities();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                message: 'Available framework capabilities',
-                capabilities: result.data || result,
               }, null, 2),
             },
           ],
