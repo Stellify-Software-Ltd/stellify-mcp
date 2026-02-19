@@ -101,6 +101,39 @@ const stellify = new StellifyClient({
 //   - includes: Array of file UUIDs to import
 //
 // -----------------------------------------------------------------------------
+// VUE COMPONENT + ROUTE PATTERN (for visual editing)
+// -----------------------------------------------------------------------------
+// When building Vue components, use TWO routes to enable visual editing:
+//
+// 1. TEMPLATE ROUTE - Holds the component's UI elements for editing
+//    - create_route: name='NotesTemplate', path='/notes-template', type='web'
+//    - html_to_elements: page=templateRouteUuid, elements='<div>...</div>'
+//    - Users can visually edit these elements in the route editor
+//
+// 2. DISPLAY ROUTE - The actual page that renders the component
+//    - create_route: name='Notes', path='/notes', type='web'
+//    - html_to_elements: page=displayRouteUuid, elements='<NotesApp />'
+//    - This embeds the Vue component on the page
+//
+// 3. VUE COMPONENT FILE - Links to template route elements
+//    - create_file: type='js', extension='vue', name='NotesApp'
+//    - save_file: template=[elementUuidsFromTemplateRoute]
+//
+// WHY THIS PATTERN?
+//   - Template elements need a route to be viewable/editable in the UI
+//   - The display route keeps the clean component embedding pattern
+//   - Component logic (methods, state) stays in the .vue file
+//
+// EXAMPLE WORKFLOW:
+//   1. Create template route: '/notes-template' (for editing)
+//   2. Create display route: '/notes' (for viewing)
+//   3. html_to_elements on template route (creates editable elements)
+//   4. html_to_elements on display route with '<NotesApp />'
+//   5. create_file for NotesApp.vue
+//   6. Add methods, statements, wire events
+//   7. save_file with template pointing to template route's root element
+//
+// -----------------------------------------------------------------------------
 // ELEMENT EVENT HANDLERS (for frontend files)
 // -----------------------------------------------------------------------------
 // Elements can have these event properties (value is method UUID):
@@ -115,10 +148,139 @@ const stellify = new StellifyClient({
 //   - mouseenter: Fires on mouse enter (@mouseenter)
 //   - mouseleave: Fires on mouse leave (@mouseleave)
 //
+// -----------------------------------------------------------------------------
+// STELLIFY FRAMEWORK (frontend library for Vue/JS files)
+// -----------------------------------------------------------------------------
+// Stellify Framework is an AI-friendly frontend library with constrained APIs.
+// Use these modules in Vue components for common frontend tasks.
+//
+// IMPORT PATTERN:
+//   import { Form, Http, Table } from 'stellify-framework'
+//
+// DATA & FORMS:
+//   Form.create({name:'',email:''}).validate({...}).store('/api/users')
+//   Table.create(data).addColumn('name').sort('name').paginate(10)
+//   List.create(items).add(item).remove(id).filter(fn).map(fn)
+//   Tree.create().setRoot(data).addChild(parentId,child).traverse(fn)
+//
+// NETWORK:
+//   Http.create('/api').withToken(t).get('/users').post('/users',data)
+//   Socket.create('wss://...').on('message',fn).connect().send(data)
+//   Auth.create('/api').login(creds).logout().getUser().isAuthenticated()
+//   Stream.create('/api/chat').onChunk(fn).onComplete(fn).post(data)
+//
+// GRAPHICS:
+//   Svg.create(800,600).rect(0,0,100,50).circle(50,50,20).text('Hi',10,10)
+//   Canvas.create(800,600).rect(0,0,100,50).circle(50,50,20).toDataURL()
+//   Graph.create().addNode('a').addNode('b').addEdge('a','b').layout('force')
+//   Scale.linear().domain([0,100]).range([0,500]).value(50) // returns 250
+//   Motion.tween(0,100,{duration:500}).onUpdate(fn).start()
+//
+// PLATFORM:
+//   Router.create().register('/users',component).navigate('/users')
+//   Storage.local().set('key',val).get('key').remove('key')
+//   Events.create().on('event',fn).emit('event',data)
+//   Clipboard.copy('text').paste()
+//   Notify.request().send('Title',{body:'Message'})
+//   Geo.getPosition().then(pos=>...).watchPosition(fn)
+//   Media.selectFile({accept:'image/*'}).resize(800,600).toBase64()
+//   DB.create('mydb').store({name:'items'}).open().put('items',obj)
+//   Worker.fromFunction(fn).run(data).terminate()
+//
+// AI & LANGUAGE:
+//   Speech.create().onResult(fn).listen({continuous:true})
+//   Speech.create().speak('Hello',{voice:'...'})
+//   Chat.create().addUser('Hi').addAssistant('Hello').getMessages()
+//   Embed.create().store('id',vector,meta).nearest(queryVec,5)
+//   Diff.lines(old,new) // [{type:'equal'|'insert'|'delete',value:'...'}]
+//
+// UTILITIES:
+//   Time.now().format('YYYY-MM-DD').add(7,'days').relative()
+//
+// KEY METHODS PER MODULE (max 7 each - AI-friendly constraint):
+//   Form: create,set,get,validate,store,update,delete
+//   Table: create,setData,addColumn,sort,filter,paginate
+//   Http: create,get,post,put,delete,withToken
+//   Stream: create,post,onChunk,onComplete,abort,getBuffer
+//   Speech: create,listen,speak,stopListening,getVoices,onResult
+//   Chat: create,addMessage,getHistory,clear,fork,truncate
+//   Embed: create,store,compare,nearest,search,toJSON
+//   Diff: chars,words,lines,apply,createPatch,similarity
+//
 // =============================================================================
 
 // Define MCP tools
+// Stellify Framework API - full method reference for AI code generation
+const STELLIFY_FRAMEWORK_API = {
+  // Data & Forms
+  Form: ['create', 'set', 'get', 'getData', 'validate', 'isValid', 'getErrors', 'getError', 'reset', 'store', 'update', 'delete'],
+  Table: ['create', 'setData', 'addColumn', 'removeColumn', 'sort', 'filter', 'clearFilter', 'paginate', 'page', 'getData', 'getAllData', 'getColumns', 'getColumn', 'getTotalRows', 'getTotalPages', 'getCurrentPage', 'getPageSize', 'getSortKey', 'getSortDirection'],
+  List: ['create', 'from', 'range', 'add', 'remove', 'removeWhere', 'set', 'get', 'first', 'last', 'sort', 'sortBy', 'reverse', 'filter', 'find', 'findIndex', 'map', 'reduce', 'forEach', 'includes', 'indexOf', 'every', 'some', 'slice', 'take', 'skip', 'chunk', 'unique', 'uniqueBy', 'groupBy', 'flatten', 'concat', 'isEmpty', 'isNotEmpty', 'count', 'clear', 'toArray', 'toJSON', 'clone', 'sum', 'avg', 'min', 'max'],
+  Tree: ['create', 'setRoot', 'addChild', 'removeNode', 'getNode', 'getRoot', 'getChildren', 'getParent', 'getSiblings', 'getAncestors', 'getDescendants', 'getDepth', 'getPath', 'traverse', 'find', 'findAll', 'move', 'toArray', 'size'],
+  // Network
+  Http: ['create', 'get', 'post', 'put', 'patch', 'delete', 'withHeaders', 'withToken', 'withTimeout'],
+  Socket: ['create', 'connect', 'disconnect', 'send', 'sendEvent', 'on', 'off', 'once', 'isConnected', 'getState'],
+  Auth: ['create', 'login', 'logout', 'fetchUser', 'getUser', 'getToken', 'isAuthenticated', 'setToken', 'setUser', 'refresh', 'onAuthChange', 'offAuthChange', 'getAuthHeader'],
+  Stream: ['create', 'headers', 'withToken', 'onChunk', 'onComplete', 'onError', 'get', 'post', 'abort', 'getBuffer', 'getChunks', 'isStreaming', 'clear'],
+  // Graphics & Visualization
+  Svg: ['create', 'select', 'find', 'attr', 'attrs', 'getAttr', 'addClass', 'removeClass', 'text', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'textElement', 'group', 'clear', 'remove', 'toString', 'toElement', 'getWidth', 'getHeight'],
+  Canvas: ['create', 'fromElement', 'fromSelector', 'size', 'getWidth', 'getHeight', 'style', 'save', 'restore', 'clear', 'fill', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'arc', 'path', 'text', 'measureText', 'drawImage', 'translate', 'rotate', 'scale', 'resetTransform', 'getPixel', 'setPixel', 'getImageData', 'putImageData', 'toDataURL', 'toBlob', 'getElement', 'getContext', 'appendTo'],
+  Graph: ['create', 'size', 'addNode', 'removeNode', 'addEdge', 'removeEdge', 'getNode', 'getNodes', 'getEdges', 'getEdgesWithPositions', 'getNeighbors', 'layout'],
+  Scale: ['linear', 'log', 'time', 'band', 'domain', 'range', 'getDomain', 'getRange', 'value', 'invert', 'ticks', 'clamp', 'padding', 'bandwidth'],
+  Axis: ['create', 'orientation', 'ticks', 'tickFormat', 'tickSize', 'getTicks', 'getOrientation', 'getTickSize', 'getRange', 'isHorizontal', 'isVertical'],
+  Motion: ['tween', 'spring', 'easing', 'onUpdate', 'onComplete', 'start', 'stop', 'isRunning', 'valueAt'],
+  // Platform APIs
+  Router: ['create', 'register', 'navigate', 'back', 'forward', 'getParams', 'getQuery', 'getCurrent', 'getState', 'onNavigate', 'offNavigate', 'start'],
+  Storage: ['local', 'session', 'set', 'get', 'remove', 'clear', 'has', 'keys', 'getAll', 'size'],
+  Events: ['create', 'on', 'off', 'once', 'emit', 'clear', 'listenerCount', 'eventNames'],
+  Clipboard: ['copy', 'paste', 'copyImage', 'copyHtml', 'isSupported', 'isWriteSupported'],
+  Notify: ['request', 'send', 'getPermission', 'isSupported', 'isGranted', 'isDenied'],
+  Geo: ['getPosition', 'watchPosition', 'stopWatching', 'stopAllWatching', 'isSupported', 'distance'],
+  Media: ['selectFile', 'selectFiles', 'capture', 'getMetadata', 'resize', 'toBase64', 'toArrayBuffer', 'toText', 'formatSize', 'isImage', 'isVideo', 'isAudio'],
+  DB: ['create', 'store', 'open', 'close', 'put', 'add', 'get', 'getAll', 'find', 'delete', 'clear', 'count', 'keys', 'update', 'batch', 'deleteDatabase', 'databases'],
+  Worker: ['create', 'fromFunction', 'fromCode', 'run', 'post', 'onMessage', 'onError', 'terminate', 'isRunning', 'getPendingCount'],
+  WorkerPool: ['create', 'fromFunction', 'run', 'map', 'terminate', 'getSize', 'getActiveCount', 'getQueueLength'],
+  // AI & Language
+  Speech: ['create', 'isSupported', 'listen', 'stopListening', 'onResult', 'onInterim', 'onEnd', 'onError', 'speak', 'stopSpeaking', 'pause', 'resume', 'getVoices', 'getVoicesByLanguage', 'isSpeaking', 'isListening'],
+  Chat: ['create', 'fromHistory', 'addMessage', 'addUser', 'addAssistant', 'addSystem', 'getMessage', 'getHistory', 'getMessages', 'getLastMessage', 'getLastUserMessage', 'getLastAssistantMessage', 'updateMessage', 'removeMessage', 'clear', 'clearAll', 'fork', 'truncate', 'count', 'countTokensEstimate', 'toJSON'],
+  Embed: ['create', 'store', 'storeMany', 'get', 'remove', 'clear', 'count', 'compare', 'nearest', 'search', 'cosineSimilarity', 'euclideanDistance', 'dotProduct', 'normalize', 'average', 'toJSON', 'fromJSON'],
+  Diff: ['chars', 'words', 'lines', 'apply', 'createPatch', 'distance', 'similarity', 'commonPrefix', 'commonSuffix'],
+  // Utilities
+  Time: ['now', 'create', 'parse', 'format', 'toISO', 'toDate', 'toTimestamp', 'toUnix', 'add', 'subtract', 'diff', 'isBefore', 'isAfter', 'isSame', 'isBetween', 'startOf', 'endOf', 'year', 'month', 'day', 'weekday', 'hour', 'minute', 'second', 'relative', 'clone'],
+  // Adapters
+  useStellify: ['(generic adapter for any module)'],
+  useForm: ['bind'],
+  useTable: ['(reactive table adapter)'],
+};
+
 const tools: Tool[] = [
+  {
+    name: 'get_stellify_framework_api',
+    description: `Get the complete Stellify Framework API reference for Vue/JS development.
+
+Returns all modules and their methods for AI-friendly frontend code generation.
+
+Use this tool when you need to:
+- Look up available methods for a Stellify module
+- Verify method names before generating code
+- Understand the full API surface
+
+Example response:
+{
+  "Form": ["create", "set", "get", "validate", "store", "update", "delete", ...],
+  "Http": ["create", "get", "post", "put", "delete", "withToken", ...],
+  ...
+}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        module: {
+          type: 'string',
+          description: 'Optional: specific module to get API for (e.g., "Form", "Http"). Omit to get all modules.',
+        },
+      },
+    },
+  },
   {
     name: 'get_project',
     description: `Get the active Stellify project for the authenticated user.
@@ -1360,6 +1522,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     switch (name) {
+      case 'get_stellify_framework_api': {
+        const moduleName = args.module as string | undefined;
+        let result: any;
+
+        if (moduleName) {
+          const moduleApi = (STELLIFY_FRAMEWORK_API as any)[moduleName];
+          if (moduleApi) {
+            result = { [moduleName]: moduleApi };
+          } else {
+            result = { error: `Module "${moduleName}" not found. Available: ${Object.keys(STELLIFY_FRAMEWORK_API).join(', ')}` };
+          }
+        } else {
+          result = STELLIFY_FRAMEWORK_API;
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
       case 'get_project': {
         const result = await stellify.getProject();
         const projectData = result.data || result;
