@@ -59,6 +59,8 @@ export interface CreateRouteParams {
   path: string;
   method: string;
   type?: string;
+  controller?: string;
+  controller_method?: string;
   data?: any;
 }
 
@@ -154,6 +156,11 @@ export class StellifyClient {
 
   async getRoute(route: string) {
     const response = await this.client.get(`/route/${route}`);
+    return response.data;
+  }
+
+  async saveRoute(route: string, data: any) {
+    const response = await this.client.put(`/route/${route}`, { uuid: route, ...data });
     return response.data;
   }
 

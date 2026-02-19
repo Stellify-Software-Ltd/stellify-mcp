@@ -551,7 +551,30 @@ Example:
   },
   {
     name: 'create_route',
-    description: 'Create a new route/page in a Stellify project',
+    description: `Create a new route/page in a Stellify project.
+
+IMPORTANT - WIRING ROUTES TO CONTROLLERS:
+For API routes to execute code, you MUST connect them to a controller and method:
+- controller: UUID of the controller file (e.g., NoteController)
+- controller_method: UUID of the method to execute (e.g., index, store, update, destroy)
+
+Without these fields, the route exists but won't execute any code!
+
+EXAMPLE - Create an API route wired to a controller:
+{
+  "project_id": "project-uuid",
+  "name": "notes.index",
+  "path": "/api/notes",
+  "method": "GET",
+  "type": "api",
+  "controller": "controller-file-uuid",
+  "controller_method": "index-method-uuid"
+}
+
+WORKFLOW for API endpoints:
+1. Create controller with create_file (type: "controller") or create_resources
+2. Create methods with create_method + add_method_body
+3. Create route with create_route, passing controller and controller_method UUIDs`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -561,11 +584,11 @@ Example:
         },
         name: {
           type: 'string',
-          description: 'Route/page name (e.g., "Home", "Counter", "About")',
+          description: 'Route/page name (e.g., "Home", "Counter", "notes.index")',
         },
         path: {
           type: 'string',
-          description: 'URL path (e.g., "/", "/counter", "/about")',
+          description: 'URL path (e.g., "/", "/counter", "/api/notes")',
         },
         method: {
           type: 'string',
@@ -578,6 +601,14 @@ Example:
           enum: ['web', 'api'],
           description: 'Route type: "web" for pages, "api" for API endpoints',
           default: 'web',
+        },
+        controller: {
+          type: 'string',
+          description: 'UUID of the controller file to handle this route. Required for API routes to execute code.',
+        },
+        controller_method: {
+          type: 'string',
+          description: 'UUID of the method within the controller to execute. Required for API routes to execute code.',
         },
         data: {
           type: 'object',
@@ -602,6 +633,74 @@ Use this to look up a route you created or to find existing routes in the projec
         uuid: {
           type: 'string',
           description: 'The UUID of the route to retrieve',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
+    name: 'save_route',
+    description: `Update an existing route/page. Use this to wire a route to a controller method.
+
+IMPORTANT: This is how you connect API routes to controller methods!
+
+Example - Wire an API route to a controller method:
+{
+  "uuid": "route-uuid",
+  "controller": "controller-file-uuid",
+  "controller_method": "method-uuid"
+}
+
+Available fields:
+- controller: UUID of the controller file
+- controller_method: UUID of the method to execute
+- path: URL path
+- name: Route name
+- type: "web" or "api"
+- method: HTTP method (GET, POST, PUT, DELETE, PATCH)
+- middleware: Array of middleware names
+- public: Whether the route is public (no auth required)`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the route to update',
+        },
+        controller: {
+          type: 'string',
+          description: 'UUID of the controller file to handle this route',
+        },
+        controller_method: {
+          type: 'string',
+          description: 'UUID of the method within the controller to execute',
+        },
+        path: {
+          type: 'string',
+          description: 'URL path (e.g., "/api/notes")',
+        },
+        name: {
+          type: 'string',
+          description: 'Route name',
+        },
+        type: {
+          type: 'string',
+          enum: ['web', 'api'],
+          description: 'Route type',
+        },
+        method: {
+          type: 'string',
+          enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+          description: 'HTTP method',
+        },
+        middleware: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of middleware names',
+        },
+        public: {
+          type: 'boolean',
+          description: 'Whether the route is public (no auth required)',
         },
       },
       required: ['uuid'],
@@ -1146,6 +1245,30 @@ RELATIONSHIP TYPES:
 - belongsTo: Inverse of hasOne/hasMany (Post belongsTo User)
 - belongsToMany: Many-to-many (User belongsToMany Roles)
 
+IMPORTANT - WIRING ROUTES TO CONTROLLERS:
+This tool creates controller methods but does NOT automatically wire routes to them.
+After calling create_resources, you must MANUALLY wire routes using create_route:
+
+1. Note the returned controller UUID and method UUIDs from the response
+2. For each API route, call create_route with:
+   - controller: the controller file UUID
+   - controller_method: the specific method UUID (index, store, update, destroy)
+
+Example response structure:
+{
+  "controller": {
+    "uuid": "controller-uuid",
+    "methods": [
+      { "uuid": "index-method-uuid", "name": "index" },
+      { "uuid": "store-method-uuid", "name": "store" },
+      ...
+    ]
+  }
+}
+
+Then create routes:
+create_route({ path: "/api/notes", method: "GET", controller: "controller-uuid", controller_method: "index-method-uuid" })
+
 Returns UUIDs for all created files so you can customize them further if needed.`,
     inputSchema: {
       type: 'object',
@@ -1689,6 +1812,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: JSON.stringify({
                 success: true,
                 message: `Route: "${routeData.name}" at ${routeData.path}`,
+                route: routeData,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'save_route': {
+        const { uuid, ...updateData } = args as any;
+        const result = await stellify.saveRoute(uuid, updateData);
+        const routeData = result.data || result;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Updated route "${uuid}"${updateData.controller ? ' with controller wiring' : ''}`,
                 route: routeData,
               }, null, 2),
             },
