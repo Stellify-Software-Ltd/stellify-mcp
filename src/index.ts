@@ -27,224 +27,6 @@ const stellify = new StellifyClient({
   apiToken: API_TOKEN,
 });
 
-// =============================================================================
-// STELLIFY AI WORKFLOW GUIDE
-// =============================================================================
-// Stellify stores code as structured JSON, not text files.
-// This enables surgical AI edits at the statement level.
-//
-// -----------------------------------------------------------------------------
-// REAL-TIME UI BROADCASTING (use this for demonstrations!)
-// -----------------------------------------------------------------------------
-// When users ask you to SHOW, DISPLAY, BUILD, or DEMONSTRATE anything visually,
-// use broadcast_element_command FIRST. This sends real-time updates via WebSocket
-// directly to the user's browser - no database storage, instant feedback.
-//
-// Use broadcast_element_command for:
-// - Showing the user something visually
-// - Building UI elements as you discuss them
-// - Sending messages/content to the browser
-// - Any "live" or "real-time" interaction
-//
-// Use html_to_elements/update_element for:
-// - Permanent changes that should persist
-// - Building components that will be saved
-//
-// SUPPORTED FILE TYPES:
-// - PHP: Controllers, Models, Middleware, Classes
-// - JavaScript/TypeScript: JS files, Vue SFCs
-// - UI: Elements (HTML structure stored as JSON)
-//
-// -----------------------------------------------------------------------------
-// GENERAL WORKFLOW (applies to all file types)
-// -----------------------------------------------------------------------------
-// 1. Create file skeleton (create_file) - empty structure, no methods yet
-// 2. Add methods (create_method) - creates signature only
-// 3. Add method bodies (add_method_body) - implementation code
-// 4. Add statements (create_statement + add_statement_code) - for non-method code
-// 5. Save file (save_file) - finalize with all references
-//
-// -----------------------------------------------------------------------------
-// PHP EXAMPLE: Creating a Controller
-// -----------------------------------------------------------------------------
-// 1. create_file: type='controller', name='UserController'
-// 2. create_method: name='store', parameters=[{name:'request', type:'Request'}]
-// 3. add_method_body: code='return response()->json($request->all());'
-//
-// -----------------------------------------------------------------------------
-// VUE COMPONENT WORKFLOW (step-by-step)
-// -----------------------------------------------------------------------------
-// Vue components combine UI elements with reactive data. Follow this order:
-//
-// 1. get_project - Find the 'js' directory UUID
-// 2. create_file - type='js', extension='vue' in js directory
-// 3. Create statements for IMPORTS and DATA (each needs create_statement + add_statement_code):
-//    - "import { ref } from 'vue';"  ← REQUIRED for using ref()
-//    - "const count = ref(0);"
-//    NOTE: Vue imports are NOT auto-generated. You must add them manually.
-// 4. create_method - Creates method signature (returns UUID)
-//    add_method_body - Add implementation: "count.value++;"
-// 5. html_to_elements - Convert template HTML to elements (no 'page' needed)
-//    NOTE: Vue bindings like {{ count }} auto-create statements linked to elements
-// 6. update_element - Wire event handlers (e.g., click → method UUID)
-// 7. save_file - Finalize with:
-//    - extension: 'vue'
-//    - template: [rootElementUuid] (from html_to_elements)
-//    - data: [methodUuid] (METHOD UUIDs only!)
-//    - statements: [importStmtUuid, countStmtUuid] (STATEMENT UUIDs - imports, refs)
-//
-// Vue SFC file structure:
-//   - extension: 'vue'
-//   - template: Array of root element UUIDs (<template> section)
-//   - data: Array of METHOD UUIDs only (<script setup> functions)
-//   - statements: Array of STATEMENT UUIDs (<script setup> imports, variables, refs)
-//   - includes: Array of file UUIDs to import
-//
-// -----------------------------------------------------------------------------
-// VUE COMPONENT + ROUTE PATTERN (for visual editing)
-// -----------------------------------------------------------------------------
-// When building Vue components, use TWO routes to enable visual editing:
-//
-// 1. TEMPLATE ROUTE - Holds the component's UI elements for editing
-//    - create_route: name='NotesTemplate', path='/notes-template', type='web'
-//    - html_to_elements: page=templateRouteUuid, elements='<div>...</div>'
-//    - Users can visually edit these elements in the route editor
-//
-// 2. DISPLAY ROUTE - The actual page that renders the component
-//    - create_route: name='Notes', path='/notes', type='web'
-//    - html_to_elements: page=displayRouteUuid, elements='<NotesApp />'
-//    - This embeds the Vue component on the page
-//
-// 3. VUE COMPONENT FILE - Links to template route elements
-//    - create_file: type='js', extension='vue', name='NotesApp'
-//    - save_file: template=[elementUuidsFromTemplateRoute]
-//
-// WHY THIS PATTERN?
-//   - Template elements need a route to be viewable/editable in the UI
-//   - The display route keeps the clean component embedding pattern
-//   - Component logic (methods, state) stays in the .vue file
-//
-// EXAMPLE WORKFLOW:
-//   1. Create template route: '/notes-template' (for editing)
-//   2. Create display route: '/notes' (for viewing)
-//   3. html_to_elements on template route (creates editable elements)
-//   4. html_to_elements on display route with '<NotesApp />'
-//   5. create_file for NotesApp.vue
-//   6. Add methods, statements, wire events
-//   7. save_file with template pointing to template route's root element
-//
-// -----------------------------------------------------------------------------
-// ELEMENT EVENT HANDLERS (for frontend files)
-// -----------------------------------------------------------------------------
-// Elements can have these event properties (value is method UUID):
-//   - click: Fires on click (@click)
-//   - submit: Fires on form submit (@submit)
-//   - change: Fires on input change (@change)
-//   - input: Fires on input in real-time (@input)
-//   - focus: Fires when element receives focus (@focus)
-//   - blur: Fires when element loses focus (@blur)
-//   - keydown: Fires on key press (@keydown)
-//   - keyup: Fires on key release (@keyup)
-//   - mouseenter: Fires on mouse enter (@mouseenter)
-//   - mouseleave: Fires on mouse leave (@mouseleave)
-//
-// -----------------------------------------------------------------------------
-// STELLIFY FRAMEWORK (frontend library for Vue/JS files)
-// -----------------------------------------------------------------------------
-// Stellify Framework is an AI-friendly frontend library with constrained APIs.
-// Use these modules in Vue components for common frontend tasks.
-//
-// IMPORT PATTERN:
-//   import { Form, Http, Table } from 'stellify-framework'
-//
-// DATA & FORMS:
-//   Form.create({name:'',email:''}).validate({...}).store('/api/users')
-//   Table.create(data).addColumn('name').sort('name').paginate(10)
-//   List.create(items).add(item).remove(id).filter(fn).map(fn)
-//   Tree.create().setRoot(data).addChild(parentId,child).traverse(fn)
-//
-// NETWORK:
-//   Http.create('/api').withToken(t).get('/users').post('/users',data)
-//   Socket.create('wss://...').on('message',fn).connect().send(data)
-//   Auth.create('/api').login(creds).logout().getUser().isAuthenticated()
-//   Stream.create('/api/chat').onChunk(fn).onComplete(fn).post(data)
-//
-// GRAPHICS:
-//   Svg.create(800,600).rect(0,0,100,50).circle(50,50,20).text('Hi',10,10)
-//   Canvas.create(800,600).rect(0,0,100,50).circle(50,50,20).toDataURL()
-//   Graph.create().addNode('a').addNode('b').addEdge('a','b').layout('force')
-//   Scale.linear().domain([0,100]).range([0,500]).value(50) // returns 250
-//   Motion.tween(0,100,{duration:500}).onUpdate(fn).start()
-//
-// PLATFORM:
-//   Router.create().register('/users',component).navigate('/users')
-//   Storage.local().set('key',val).get('key').remove('key')
-//   Events.create().on('event',fn).emit('event',data)
-//   Clipboard.copy('text').paste()
-//   Notify.request().send('Title',{body:'Message'})
-//   Geo.getPosition().then(pos=>...).watchPosition(fn)
-//   Media.selectFile({accept:'image/*'}).resize(800,600).toBase64()
-//   DB.create('mydb').store({name:'items'}).open().put('items',obj)
-//   Worker.fromFunction(fn).run(data).terminate()
-//
-// AI & LANGUAGE:
-//   Speech.create().onResult(fn).listen({continuous:true})
-//   Speech.create().speak('Hello',{voice:'...'})
-//   Chat.create().addUser('Hi').addAssistant('Hello').getMessages()
-//   Embed.create().store('id',vector,meta).nearest(queryVec,5)
-//   Diff.lines(old,new) // [{type:'equal'|'insert'|'delete',value:'...'}]
-//
-// UTILITIES:
-//   Time.now().format('YYYY-MM-DD').add(7,'days').relative()
-//
-// KEY METHODS PER MODULE (max 7 each - AI-friendly constraint):
-//   Form: create,set,get,validate,store,update,delete
-//   Table: create,setData,addColumn,sort,filter,paginate
-//   Http: create,get,post,put,delete,withToken
-//   Stream: create,post,onChunk,onComplete,abort,getBuffer
-//   Speech: create,listen,speak,stopListening,getVoices,onResult
-//   Chat: create,addMessage,getHistory,clear,fork,truncate
-//   Embed: create,store,compare,nearest,search,toJSON
-//   Diff: chars,words,lines,apply,createPatch,similarity
-//
-// -----------------------------------------------------------------------------
-// COMMON PITFALLS - AVOID THESE MISTAKES
-// -----------------------------------------------------------------------------
-// 1. v-model requires ref(), NOT Form class
-//    WRONG: const form = Form.create({title: ''}) with v-model="form.title"
-//    RIGHT: const formData = ref({title: ''}) with v-model="formData.title"
-//
-// 2. List.from() returns List instance, not array - use .toArray() for v-for
-//    WRONG: notes.value = List.from(response.data)
-//    RIGHT: notes.value = List.from(response.data).toArray()
-//
-// 3. add_method_body APPENDS, doesn't replace - create new method to replace
-//
-// 4. Use 'inputType' not 'type' for HTML type attribute on elements
-//
-// 5. Statements go in 'statements' array, methods go in 'data' array in save_file
-//
-// 6. Always wire click handlers to METHOD UUIDs, not file UUIDs
-//
-// 7. For buttons in forms, set inputType: "button" to prevent auto-submit
-//
-// -----------------------------------------------------------------------------
-// ERROR HANDLING
-// -----------------------------------------------------------------------------
-// If a tool call fails, check:
-// - UUID validity: Is the file/method/element UUID correct and exists?
-// - Required fields: Did you provide all required parameters?
-// - Order of operations: Did you create the parent before the child?
-// - Array contents: Are you passing statement UUIDs to 'statements' (not 'data')?
-//
-// Common error scenarios:
-// - "File not found" → The file UUID is invalid or was deleted
-// - "Method not found" → The method UUID doesn't exist in that file
-// - "Invalid element type" → Use valid types like s-wrapper, s-input, s-form
-// - Empty response → Operation succeeded but returned no data (normal for deletes)
-//
-// =============================================================================
-
 // Define MCP tools
 // Stellify Framework API - full method reference for AI code generation
 const STELLIFY_FRAMEWORK_API = {
@@ -644,39 +426,9 @@ Example - Remove duplicate/unwanted statements:
   },
   {
     name: 'create_route',
-    description: `Create a new route/page in a Stellify project.
+    description: `Create a route/page. For API routes, pass controller and controller_method UUIDs to wire execution.
 
-IMPORTANT - WIRING ROUTES TO CONTROLLERS:
-For API routes to execute code, you MUST connect them to a controller and method:
-- controller: UUID of the controller file (e.g., NoteController)
-- controller_method: UUID of the method to execute (e.g., index, store, update, destroy)
-
-Without these fields, the route exists but won't execute any code!
-
-EXAMPLE - Create an API route wired to a controller:
-{
-  "project_id": "project-uuid",
-  "name": "notes.index",
-  "path": "/api/notes",
-  "method": "GET",
-  "type": "api",
-  "controller": "controller-file-uuid",
-  "controller_method": "index-method-uuid"
-}
-
-WORKFLOW for API endpoints:
-1. Create controller with create_file (type: "controller") or create_resources
-2. Create methods with create_method + add_method_body
-3. Create route with create_route, passing controller and controller_method UUIDs
-
-ROUTE PARAMETERS:
-Route parameters like {id} in "/api/notes/{id}" are automatically injected into controller method parameters when the parameter name matches.
-
-Example: Route "/api/notes/{id}" (DELETE) with controller method destroy($id)
-The $id parameter receives the value from the URL automatically.
-
-When creating methods with create_method, include the parameter:
-{ "name": "destroy", "parameters": [{ "name": "id", "datatype": "int" }] }`,
+Route params like {id} auto-inject into controller method parameters when names match.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -895,55 +647,13 @@ Generates: <div class="card p-4" v-for="note in notes" :key="note.id">`,
   },
   {
     name: 'update_element',
-    description: `Update an existing UI element (for Elements v2).
+    description: `Update a UI element's attributes.
 
-Use standard HTML attributes directly (placeholder, href, src, type, etc.).
+Pass data object with: tag, classes (array), text, variable (for v-model), and event handlers (click, submit, etc. = method UUID).
 
-Special Stellify fields:
-- name: Element name in editor
-- type: Element type (s-wrapper, s-input, etc.)
-- locked: Prevent editing (boolean)
-- tag: HTML tag (div, input, button, etc.)
-- classes: CSS classes array ["class1", "class2"]
-- text: Element text content
+Key fields: inputType (not 'type') for button/input HTML type. clickArgs for handler arguments in v-for loops.
 
-V-MODEL BINDING (for s-input elements):
-- variable: Set this to bind v-model to a reactive variable
-- Example: { "variable": "formData.title" } renders as <input v-model="formData.title" />
-- IMPORTANT: The variable must reference a Vue ref() object, NOT a Form class instance
-- CORRECT: const formData = ref({ title: '', content: '' }) → v-model="formData.title"
-- WRONG: const form = Form.create({ title: '' }) → Form class is not reactive for v-model
-
-INPUT TYPE ATTRIBUTE:
-- Use 'inputType' (not 'type') to set the HTML type attribute on buttons/inputs
-- Example: { "inputType": "button" } renders as type="button"
-- Example: { "inputType": "textarea" } renders as <textarea> instead of <input>
-- For buttons inside <form> elements, always set inputType: "button" to prevent form submission on click
-
-EVENT HANDLERS (set value to method UUID):
-- click: @click - buttons, links, any clickable element
-- submit: @submit - form submission
-- change: @change - input/select value changed (on blur)
-- input: @input - input value changing (real-time, as user types)
-- focus: @focus - element receives focus
-- blur: @blur - element loses focus
-- keydown: @keydown - key pressed down
-- keyup: @keyup - key released
-- mouseenter: @mouseenter - mouse enters element
-- mouseleave: @mouseleave - mouse leaves element
-
-EVENT HANDLER ARGUMENTS:
-When wiring click handlers that need arguments (e.g., from v-for loops), use clickArgs:
-- { "click": "delete-method-uuid", "clickArgs": "item.id" } → @click="deleteItem(item.id)"
-- { "click": "edit-method-uuid", "clickArgs": "item" } → @click="editItem(item)"
-
-Example wiring a button click to a method:
-{
-  "uuid": "button-element-uuid",
-  "data": {
-    "click": "increment-method-uuid"
-  }
-}`,
+Event handlers: click, submit, change, input, focus, blur, keydown, keyup, mouseenter, mouseleave.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1032,37 +742,11 @@ Note: To reorder elements, use update_element to modify the parent element's 'da
   },
   {
     name: 'html_to_elements',
-    description: `Convert HTML to Stellify elements in ONE operation. This is the FASTEST way to build interfaces!
+    description: `Convert HTML to Stellify elements. Returns element UUIDs to use in save_file template array.
 
-This will:
-1. Parse the HTML structure
-2. Create all elements with proper nesting and types
-3. Preserve all attributes, classes, text content
-4. Auto-detect Vue bindings ({{ variable }}) and create linked statements
-5. Return element UUIDs to use in save_file template array
+Auto-detects Vue bindings ({{ var }}). For Vue components, omit 'page'. For pages, provide route UUID.
 
-Element type mapping:
-- button, input, textarea, select → s-input
-- div, span, p, section, etc. → s-wrapper
-- form → s-form
-- img, video, audio → s-media
-
-VUE BINDING AUTO-DETECTION:
-Text like {{ count }} is automatically detected and:
-- A statement is created with the binding code
-- The statement UUID is added to the element's 'statements' array
-- You still need to create the reactive data source separately (const count = ref(0))
-
-For Vue components: Omit 'page' - elements are created standalone for the component template.
-For page content: Provide 'page' (route UUID) to attach elements directly.
-
-ICONS - Best practices:
-- Prefer SVG icons or icon fonts (Heroicons, Font Awesome) over emoji
-- Use HTML entities where available (e.g., &times; for ×)
-- Avoid raw emoji characters as they may have encoding issues
-- Example: <button><svg>...</svg></button> instead of <button>🗑️</button>
-
-IMPORTANT: Use the returned root element UUID in save_file's template array.`,
+Prefer SVG icons over emoji (encoding issues).`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1356,35 +1040,11 @@ IMPORTANT: Check existing directories first using get_project and get_directory 
   },
   {
     name: 'broadcast_element_command',
-    description: `Broadcast a real-time command to update UI elements via WebSocket.
+    description: `Push real-time UI updates via WebSocket. Use for SHOW/DISPLAY/DEMONSTRATE requests.
 
-IMPORTANT: USE THIS TOOL FIRST when the user asks you to:
-- Show, display, or demonstrate something visually
-- Update, change, or modify what's on screen
-- Build or create UI elements for demonstration
-- Send messages or content to the browser
-- Do anything "live" or "in real-time"
+Actions: update (modify element), create (ephemeral element), batch (multiple updates), delete.
 
-This is the PRIMARY tool for real-time AI-to-browser communication. It pushes changes instantly to all connected browsers. Changes are EPHEMERAL (not saved to database) - perfect for demonstrations, live content, and interactive sessions.
-
-ACTIONS:
-- update: Modify an existing element's attributes (text, classes, styles, etc.)
-- create: Create a new ephemeral element (provide any UUID string you want)
-- batch: Modify multiple elements at once
-- delete: Remove an element from the UI state
-
-TO CREATE EPHEMERAL ELEMENTS (not stored in database):
-1. First, use action="create" with any UUID (e.g., "msg-001") and full element structure in changes
-2. Then, use action="update" on the PARENT element to add your new UUID to its "data" array
-
-Example - Update existing element text:
-{ action: "update", element: "existing-uuid", changes: { text: "Hello world!", classes: ["p-4", "bg-blue-500"] } }
-
-Example - Create ephemeral child element:
-Step 1: { action: "create", element: "my-new-element", changes: { type: "s-wrapper", tag: "div", text: "I exist!", classes: ["p-2", "bg-green-500"] } }
-Step 2: { action: "update", element: "parent-uuid", changes: { data: ["my-new-element"] } }
-
-For PERSISTENT changes (saved to database), use update_element or html_to_elements instead.`,
+Changes are EPHEMERAL (not saved). For persistent changes, use update_element or html_to_elements.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1419,80 +1079,13 @@ For PERSISTENT changes (saved to database), use update_element or html_to_elemen
   },
   {
     name: 'create_resources',
-    description: `Scaffold a complete resource stack in ONE operation. Creates Model, Controller, Service, and Migration together.
+    description: `Scaffold Model, Controller, Service, and Migration in ONE operation.
 
-This is the FASTEST way to bootstrap new features! Instead of 20+ individual API calls, create everything at once.
+Creates: Model ($fillable, $casts, relationships), Controller (CRUD actions), Service (optional), Migration.
 
-WHAT IT CREATES:
-- Model: With $fillable, $casts, and relationship methods
-- Controller: With index, store, show, update, destroy actions
-- Service (optional): Business logic layer with list, find, create, update, delete methods
-- Migration: With proper column types based on field definitions
+IMPORTANT: Routes are NOT auto-wired. After creation, use create_route with the returned controller UUID and method UUIDs.
 
-EXAMPLE - Create a User resource:
-{
-  "name": "User",
-  "fields": [
-    { "name": "name", "type": "string" },
-    { "name": "email", "type": "string", "unique": true },
-    { "name": "password", "type": "string" },
-    { "name": "is_active", "type": "boolean", "default": true }
-  ],
-  "relationships": [
-    { "type": "hasMany", "model": "Post" }
-  ],
-  "controller": true,
-  "service": true,
-  "migration": true
-}
-
-FIELD TYPES:
-- string, text, longtext (text fields)
-- integer, int, bigint (numbers)
-- boolean, bool (true/false)
-- float, double, decimal (decimals)
-- date, datetime, timestamp (dates)
-- json (JSON/array data)
-- email (string with email validation)
-
-FIELD OPTIONS:
-- nullable: Allow NULL values
-- unique: Add unique constraint
-- required: Require in validation (default: true for store)
-- default: Default value
-- max: Maximum length/value
-
-RELATIONSHIP TYPES:
-- hasOne: One-to-one (User hasOne Profile)
-- hasMany: One-to-many (User hasMany Posts)
-- belongsTo: Inverse of hasOne/hasMany (Post belongsTo User)
-- belongsToMany: Many-to-many (User belongsToMany Roles)
-
-IMPORTANT - WIRING ROUTES TO CONTROLLERS:
-This tool creates controller methods but does NOT automatically wire routes to them.
-After calling create_resources, you must MANUALLY wire routes using create_route:
-
-1. Note the returned controller UUID and method UUIDs from the response
-2. For each API route, call create_route with:
-   - controller: the controller file UUID
-   - controller_method: the specific method UUID (index, store, update, destroy)
-
-Example response structure:
-{
-  "controller": {
-    "uuid": "controller-uuid",
-    "methods": [
-      { "uuid": "index-method-uuid", "name": "index" },
-      { "uuid": "store-method-uuid", "name": "store" },
-      ...
-    ]
-  }
-}
-
-Then create routes:
-create_route({ path: "/api/notes", method: "GET", controller: "controller-uuid", controller_method: "index-method-uuid" })
-
-Returns UUIDs for all created files so you can customize them further if needed.`,
+Response includes controller.methods array with {uuid, name} for each action (index, store, update, destroy).`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1799,6 +1392,38 @@ Key concepts:
 - Vue components link to UI elements via the 'template' field
 - Event handlers (click, submit) wire UI elements to methods by UUID
 
+## General Workflow (all file types)
+
+1. create_file → empty shell, returns file UUID
+2. create_method → signature only, returns method UUID
+3. add_method_body → implementation code
+4. create_statement + add_statement_code → for imports, variables, refs
+5. save_file → finalize with template/data/statements arrays
+
+## Vue Component Workflow
+
+1. get_project → find 'js' directory UUID
+2. create_file → type='js', extension='vue'
+3. Create statements for imports: "import { ref } from 'vue';" (REQUIRED for ref())
+4. Create statements for data: "const count = ref(0);"
+5. create_method + add_method_body → functions
+6. html_to_elements → template (no 'page' param for components)
+7. update_element → wire click handlers to method UUIDs
+8. save_file with: extension='vue', template=[elementUuid], data=[methodUuids], statements=[importUuids, refUuids]
+
+## Real-Time UI (broadcast_element_command)
+
+Use for SHOW/DISPLAY/DEMONSTRATE requests - sends instant WebSocket updates to browser.
+Use html_to_elements/update_element for permanent/saved changes.
+
+## Common Pitfalls
+
+- v-model requires ref(), NOT Form class: const formData = ref({title: ''})
+- List.from() returns List, not array - use .toArray() for v-for
+- add_method_body APPENDS, doesn't replace - create new method to replace
+- 'data' array = method UUIDs, 'statements' array = import/variable UUIDs
+- For buttons in forms, set inputType: "button" to prevent auto-submit
+
 ## Framework Capabilities (Libraries/Packages)
 
 **CRITICAL: You write BUSINESS LOGIC only. Capabilities are installed packages/libraries (Sanctum, Stripe, AWS SDK, etc.) that Stellify provides. You CANNOT create these by writing code.**
@@ -1830,20 +1455,16 @@ Examples of capabilities (packages you cannot write):
 
 When building features, group related files by passing a "module" parameter.
 
-**WORKFLOW:** Simply include the 'module' parameter when creating files or routes:
-
 - create_file(..., module: "blog-posts") - auto-groups file
 - create_route(..., module: "blog-posts") - auto-groups route
 
-Modules are auto-created if they don't exist. This helps users see all code related to a feature grouped together.
-
-Example module names: "user-auth", "blog-posts", "product-catalog", "order-management", "admin-dashboard"`;
+Modules are auto-created if they don't exist. This helps users see all code related to a feature grouped together.`;
 
 // Create MCP server
 const server = new Server(
   {
     name: 'stellify-mcp',
-    version: '0.1.0',
+    version: '0.1.22',
   },
   {
     capabilities: {
