@@ -207,6 +207,42 @@ const stellify = new StellifyClient({
 //   Embed: create,store,compare,nearest,search,toJSON
 //   Diff: chars,words,lines,apply,createPatch,similarity
 //
+// -----------------------------------------------------------------------------
+// COMMON PITFALLS - AVOID THESE MISTAKES
+// -----------------------------------------------------------------------------
+// 1. v-model requires ref(), NOT Form class
+//    WRONG: const form = Form.create({title: ''}) with v-model="form.title"
+//    RIGHT: const formData = ref({title: ''}) with v-model="formData.title"
+//
+// 2. List.from() returns List instance, not array - use .toArray() for v-for
+//    WRONG: notes.value = List.from(response.data)
+//    RIGHT: notes.value = List.from(response.data).toArray()
+//
+// 3. add_method_body APPENDS, doesn't replace - create new method to replace
+//
+// 4. Use 'inputType' not 'type' for HTML type attribute on elements
+//
+// 5. Statements go in 'statements' array, methods go in 'data' array in save_file
+//
+// 6. Always wire click handlers to METHOD UUIDs, not file UUIDs
+//
+// 7. For buttons in forms, set inputType: "button" to prevent auto-submit
+//
+// -----------------------------------------------------------------------------
+// ERROR HANDLING
+// -----------------------------------------------------------------------------
+// If a tool call fails, check:
+// - UUID validity: Is the file/method/element UUID correct and exists?
+// - Required fields: Did you provide all required parameters?
+// - Order of operations: Did you create the parent before the child?
+// - Array contents: Are you passing statement UUIDs to 'statements' (not 'data')?
+//
+// Common error scenarios:
+// - "File not found" → The file UUID is invalid or was deleted
+// - "Method not found" → The method UUID doesn't exist in that file
+// - "Invalid element type" → Use valid types like s-wrapper, s-input, s-form
+// - Empty response → Operation succeeded but returned no data (normal for deletes)
+//
 // =============================================================================
 
 // Define MCP tools
@@ -264,6 +300,14 @@ Use this tool when you need to:
 - Look up available methods for a Stellify module
 - Verify method names before generating code
 - Understand the full API surface
+
+IMPORTANT - List class and Vue reactivity:
+The List class methods return List instances, NOT plain arrays.
+Vue's v-for directive cannot iterate over List instances directly.
+
+When assigning to a Vue ref that will be used with v-for, call .toArray():
+- CORRECT: notes.value = List.from(response.data).toArray();
+- INCORRECT (v-for won't work): notes.value = List.from(response.data);
 
 Example response:
 {
@@ -446,7 +490,14 @@ Example response includes:
   },
   {
     name: 'add_method_body',
-    description: 'Parse and add PHP code to a method body. Provide the method implementation code (without the function declaration). Stellify will parse it into structured statements.',
+    description: `Parse and add PHP code to a method body. Provide the method implementation code (without the function declaration). Stellify will parse it into structured statements.
+
+IMPORTANT: This APPENDS to existing method statements. To REPLACE a method's code:
+1. Create a NEW method with create_method
+2. Add body with add_method_body
+3. Update the file's 'data' array to include new method UUID (remove old one)
+4. Update any element click handlers to reference the new method UUID
+5. Optionally delete the old method with delete_method`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -468,15 +519,24 @@ Example response includes:
   },
   {
     name: 'save_method',
-    description: `Update an existing method's properties (name, visibility, returnType, nullable, parameters).
+    description: `Update an existing method's properties (name, visibility, returnType, nullable, parameters, data).
 
 Use this to modify a method after creation. For updating the method body, use add_method_body instead.
 
-Example:
+Parameters:
+- data: Array of statement UUIDs that form the method body. Use this to reorder statements or remove unwanted statements from the method.
+
+Example - Update return type:
 {
   "uuid": "method-uuid",
   "returnType": "object",
   "nullable": true
+}
+
+Example - Remove duplicate/unwanted statements:
+{
+  "uuid": "method-uuid",
+  "data": ["statement-uuid-1", "statement-uuid-2"]  // Only keep these statements
 }`,
     inputSchema: {
       type: 'object',
@@ -511,6 +571,11 @@ Example:
           description: 'Array of parameter clause UUIDs',
           items: { type: 'string' },
         },
+        data: {
+          type: 'array',
+          description: 'Array of statement UUIDs that form the method body. Use to reorder or remove statements.',
+          items: { type: 'string' },
+        },
       },
       required: ['uuid'],
     },
@@ -530,6 +595,34 @@ Example:
           description: 'Optional: filter results to a specific file',
         },
       },
+    },
+  },
+  {
+    name: 'delete_method',
+    description: 'Delete a method from a file by UUID. This permanently removes the method and all its code.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the method to delete',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
+    name: 'get_method',
+    description: 'Get a method by UUID. Returns the method data including its parameters and body.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the method to retrieve',
+        },
+      },
+      required: ['uuid'],
     },
   },
   {
@@ -574,7 +667,16 @@ EXAMPLE - Create an API route wired to a controller:
 WORKFLOW for API endpoints:
 1. Create controller with create_file (type: "controller") or create_resources
 2. Create methods with create_method + add_method_body
-3. Create route with create_route, passing controller and controller_method UUIDs`,
+3. Create route with create_route, passing controller and controller_method UUIDs
+
+ROUTE PARAMETERS:
+Route parameters like {id} in "/api/notes/{id}" are automatically injected into controller method parameters when the parameter name matches.
+
+Example: Route "/api/notes/{id}" (DELETE) with controller method destroy($id)
+The $id parameter receives the value from the URL automatically.
+
+When creating methods with create_method, include the parameter:
+{ "name": "destroy", "parameters": [{ "name": "id", "datatype": "int" }] }`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -707,6 +809,22 @@ Available fields:
     },
   },
   {
+    name: 'delete_route',
+    description: `Delete a route/page from the project by UUID. This permanently removes the route.
+
+WARNING: This is destructive and cannot be undone. Any elements attached to this route will become orphaned.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the route to delete',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
     name: 'search_routes',
     description: `Search for routes/pages in the project by name. Use this to find existing routes before creating new ones.
 
@@ -739,7 +857,17 @@ Valid element types:
 - HTML5: s-wrapper, s-input, s-form, s-svg, s-shape, s-media, s-iframe
 - Components: s-loop, s-transition, s-freestyle, s-motion
 - Blade: s-directive
-- Shadcn/ui: s-chart, s-table, s-combobox, s-accordion, s-calendar, s-contiguous`,
+- Shadcn/ui: s-chart, s-table, s-combobox, s-accordion, s-calendar, s-contiguous
+
+s-loop ELEMENT TYPE:
+Use s-loop for elements that should render with v-for directive.
+Required attributes (set via update_element after creation):
+- loop: The v-for expression (e.g., "note in notes", "item in items")
+- key: The :key binding (e.g., "note.id", "item.id")
+
+Example: After creating s-loop, update it with:
+{ "tag": "div", "loop": "note in notes", "key": "note.id", "classes": ["card", "p-4"] }
+Generates: <div class="card p-4" v-for="note in notes" :key="note.id">`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -779,6 +907,19 @@ Special Stellify fields:
 - classes: CSS classes array ["class1", "class2"]
 - text: Element text content
 
+V-MODEL BINDING (for s-input elements):
+- variable: Set this to bind v-model to a reactive variable
+- Example: { "variable": "formData.title" } renders as <input v-model="formData.title" />
+- IMPORTANT: The variable must reference a Vue ref() object, NOT a Form class instance
+- CORRECT: const formData = ref({ title: '', content: '' }) → v-model="formData.title"
+- WRONG: const form = Form.create({ title: '' }) → Form class is not reactive for v-model
+
+INPUT TYPE ATTRIBUTE:
+- Use 'inputType' (not 'type') to set the HTML type attribute on buttons/inputs
+- Example: { "inputType": "button" } renders as type="button"
+- Example: { "inputType": "textarea" } renders as <textarea> instead of <input>
+- For buttons inside <form> elements, always set inputType: "button" to prevent form submission on click
+
 EVENT HANDLERS (set value to method UUID):
 - click: @click - buttons, links, any clickable element
 - submit: @submit - form submission
@@ -790,6 +931,11 @@ EVENT HANDLERS (set value to method UUID):
 - keyup: @keyup - key released
 - mouseenter: @mouseenter - mouse enters element
 - mouseleave: @mouseleave - mouse leaves element
+
+EVENT HANDLER ARGUMENTS:
+When wiring click handlers that need arguments (e.g., from v-for loops), use clickArgs:
+- { "click": "delete-method-uuid", "clickArgs": "item.id" } → @click="deleteItem(item.id)"
+- { "click": "edit-method-uuid", "clickArgs": "item" } → @click="editItem(item)"
 
 Example wiring a button click to a method:
 {
@@ -910,6 +1056,12 @@ Text like {{ count }} is automatically detected and:
 For Vue components: Omit 'page' - elements are created standalone for the component template.
 For page content: Provide 'page' (route UUID) to attach elements directly.
 
+ICONS - Best practices:
+- Prefer SVG icons or icon fonts (Heroicons, Font Awesome) over emoji
+- Use HTML entities where available (e.g., &times; for ×)
+- Avoid raw emoji characters as they may have encoding issues
+- Example: <button><svg>...</svg></button> instead of <button>🗑️</button>
+
 IMPORTANT: Use the returned root element UUID in save_file's template array.`,
     inputSchema: {
       type: 'object',
@@ -963,7 +1115,7 @@ Use cases:
 - PHP: Class properties, use statements, constants
 - JS/Vue: Variable declarations, imports, reactive refs
 
-For Vue components, include the returned statement UUID in save_file's 'data' array.`,
+For Vue components, include the returned statement UUID in save_file's 'statements' array (NOT 'data' - that's for methods).`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1004,6 +1156,38 @@ Examples:
         },
       },
       required: ['file', 'statement', 'code'],
+    },
+  },
+  {
+    name: 'delete_statement',
+    description: 'Delete a statement from a file by UUID. This permanently removes the statement (import, variable, ref, etc.).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the statement to delete',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
+    name: 'save_statement',
+    description: 'Update an existing statement. Use this to modify statement properties after creation.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the statement to update',
+        },
+        data: {
+          type: 'object',
+          description: 'Statement data to update',
+        },
+      },
+      required: ['uuid'],
     },
   },
   {
@@ -1075,6 +1259,11 @@ For <script setup> content, the order in statements array determines output orde
           items: { type: 'string' },
           description: 'Array of file UUIDs to import',
         },
+        models: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of model file UUIDs that this controller uses (required for model class loading)',
+        },
       },
       required: ['uuid', 'name', 'type'],
     },
@@ -1088,6 +1277,22 @@ For <script setup> content, the order in statements array determines output orde
         uuid: {
           type: 'string',
           description: 'UUID of the file to retrieve',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
+    name: 'delete_file',
+    description: `Delete a file from the project by UUID. This permanently removes the file and all its methods/statements.
+
+WARNING: This is destructive and cannot be undone. Make sure the file is not referenced elsewhere before deleting.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the file to delete',
         },
       },
       required: ['uuid'],
@@ -1129,6 +1334,24 @@ IMPORTANT: Check existing directories first using get_project and get_directory 
         },
       },
       required: ['name'],
+    },
+  },
+  {
+    name: 'save_directory',
+    description: 'Update an existing directory. Use this to rename or modify directory properties.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the directory to update',
+        },
+        name: {
+          type: 'string',
+          description: 'New directory name',
+        },
+      },
+      required: ['uuid'],
     },
   },
   {
@@ -1770,6 +1993,39 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      case 'delete_method': {
+        const { uuid } = args as { uuid: string };
+        const result = await stellify.deleteMethod(uuid);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Deleted method ${uuid}`,
+                data: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_method': {
+        const { uuid } = args as { uuid: string };
+        const result = await stellify.getMethod(uuid);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                method: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
       case 'search_files': {
         const result = await stellify.searchFiles(args as any);
         return {
@@ -1831,6 +2087,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 success: true,
                 message: `Updated route "${uuid}"${updateData.controller ? ' with controller wiring' : ''}`,
                 route: routeData,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'delete_route': {
+        const { uuid } = args as { uuid: string };
+        const result = await stellify.deleteRoute(uuid);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Deleted route ${uuid}`,
+                data: result,
               }, null, 2),
             },
           ],
@@ -2025,6 +2298,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      case 'delete_statement': {
+        const { uuid } = args as { uuid: string };
+        const result = await stellify.deleteStatement(uuid);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Deleted statement ${uuid}`,
+                data: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'save_statement': {
+        const { uuid, ...data } = args as any;
+        const result = await stellify.saveStatement(uuid, data);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Saved statement ${uuid}`,
+                statement: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
       case 'save_file': {
         const { uuid, ...data } = args as any;
         const result = await stellify.saveFile(uuid, { uuid, ...data });
@@ -2052,6 +2359,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: JSON.stringify({
                 success: true,
                 file: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'delete_file': {
+        const { uuid } = args as { uuid: string };
+        const result = await stellify.deleteFile(uuid);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Deleted file ${uuid}`,
+                data: result,
               }, null, 2),
             },
           ],
@@ -2088,6 +2412,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   : `Created directory "${(args as any).name}" (${result.data?.uuid || result.uuid})`,
                 directory: result.data || result,
                 existing: result.existing || false,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'save_directory': {
+        const { uuid, ...data } = args as any;
+        const result = await stellify.saveDirectory(uuid, data);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Saved directory ${uuid}`,
+                directory: result,
               }, null, 2),
             },
           ],

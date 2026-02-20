@@ -124,6 +124,11 @@ export class StellifyClient {
     return response.data;
   }
 
+  async deleteFile(file: string) {
+    const response = await this.client.delete(`/file/${file}`);
+    return response.data;
+  }
+
   async getMethod(method: string) {
     const response = await this.client.get(`/method/${method}`);
     return response.data;
@@ -134,6 +139,11 @@ export class StellifyClient {
     return response.data;
   }
 
+  async deleteMethod(method: string) {
+    const response = await this.client.delete(`/method/${method}`);
+    return response.data;
+  }
+
   async createStatement(params: { file?: string; method?: string }) {
     const response = await this.client.post('/statement', params);
     return response.data;
@@ -141,6 +151,11 @@ export class StellifyClient {
 
   async getStatement(statement: string) {
     const response = await this.client.get(`/statement/${statement}`);
+    return response.data;
+  }
+
+  async deleteStatement(statement: string) {
+    const response = await this.client.delete(`/statement/${statement}`);
     return response.data;
   }
 
@@ -161,6 +176,11 @@ export class StellifyClient {
 
   async saveRoute(route: string, data: any) {
     const response = await this.client.put(`/route/${route}`, { uuid: route, ...data });
+    return response.data;
+  }
+
+  async deleteRoute(route: string) {
+    const response = await this.client.delete(`/route/${route}`);
     return response.data;
   }
 
