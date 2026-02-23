@@ -124,8 +124,8 @@ export class StellifyClient {
     return response.data;
   }
 
-  async deleteFile(file: string) {
-    const response = await this.client.delete(`/file/${file}`);
+  async deleteFile(directory: string, file: string) {
+    const response = await this.client.delete(`/file/${directory}/${file}`);
     return response.data;
   }
 
@@ -139,8 +139,8 @@ export class StellifyClient {
     return response.data;
   }
 
-  async deleteMethod(method: string) {
-    const response = await this.client.delete(`/method/${method}`);
+  async deleteMethod(file: string, method: string) {
+    const response = await this.client.delete(`/method/${file}/${method}`);
     return response.data;
   }
 
@@ -154,8 +154,8 @@ export class StellifyClient {
     return response.data;
   }
 
-  async deleteStatement(statement: string) {
-    const response = await this.client.delete(`/statement/${statement}`);
+  async deleteStatement(file: string, method: string, statement: string) {
+    const response = await this.client.delete(`/statement/${file}/${method}/${statement}`);
     return response.data;
   }
 

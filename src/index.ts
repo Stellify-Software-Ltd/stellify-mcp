@@ -83,6 +83,10 @@ Use this tool when you need to:
 - Verify method names before generating code
 - Understand the full API surface
 
+IMPORTANT - Stellify Framework Import:
+The npm package is "stellify-framework" (NOT @stellify/core).
+Import like: import { Http, List, Form } from 'stellify-framework';
+
 IMPORTANT - List class and Vue reactivity:
 The List class methods return List instances, NOT plain arrays.
 Vue's v-for directive cannot iterate over List instances directly.
@@ -301,18 +305,25 @@ IMPORTANT: This APPENDS to existing method statements. To REPLACE a method's cod
   },
   {
     name: 'save_method',
-    description: `Update an existing method's properties (name, visibility, returnType, nullable, parameters, data).
+    description: `Update an existing method's properties (name, visibility, returnType, nullable, parameters, data, is_async).
 
 Use this to modify a method after creation. For updating the method body, use add_method_body instead.
 
 Parameters:
 - data: Array of statement UUIDs that form the method body. Use this to reorder statements or remove unwanted statements from the method.
+- is_async: Set to true for JavaScript/Vue methods that use await.
 
 Example - Update return type:
 {
   "uuid": "method-uuid",
   "returnType": "object",
   "nullable": true
+}
+
+Example - Mark method as async (for methods using await):
+{
+  "uuid": "method-uuid",
+  "is_async": true
 }
 
 Example - Remove duplicate/unwanted statements:
@@ -358,6 +369,10 @@ Example - Remove duplicate/unwanted statements:
           description: 'Array of statement UUIDs that form the method body. Use to reorder or remove statements.',
           items: { type: 'string' },
         },
+        is_async: {
+          type: 'boolean',
+          description: 'Whether the method is async (JavaScript/Vue only). Set to true for methods that use await.',
+        },
       },
       required: ['uuid'],
     },
@@ -381,16 +396,20 @@ Example - Remove duplicate/unwanted statements:
   },
   {
     name: 'delete_method',
-    description: 'Delete a method from a file by UUID. This permanently removes the method and all its code.',
+    description: 'Delete a method from a file by UUID. This permanently removes the method and all its code. Requires both the file UUID and method UUID.',
     inputSchema: {
       type: 'object',
       properties: {
+        file: {
+          type: 'string',
+          description: 'UUID of the file containing the method (required)',
+        },
         uuid: {
           type: 'string',
           description: 'UUID of the method to delete',
         },
       },
-      required: ['uuid'],
+      required: ['file', 'uuid'],
     },
   },
   {
@@ -848,12 +867,20 @@ Examples:
     inputSchema: {
       type: 'object',
       properties: {
+        file: {
+          type: 'string',
+          description: 'UUID of the file containing the statement',
+        },
+        method: {
+          type: 'string',
+          description: 'UUID of the method containing the statement (use "file" for file-level statements)',
+        },
         uuid: {
           type: 'string',
           description: 'UUID of the statement to delete',
         },
       },
-      required: ['uuid'],
+      required: ['file', 'method', 'uuid'],
     },
   },
   {
@@ -902,7 +929,12 @@ Vue SFC example:
     statements: [importStmtUuid, refStmtUuid]  // Statement UUIDs (imports, refs)
   })
 
-For <script setup> content, the order in statements array determines output order.`,
+For <script setup> content, the order in statements array determines output order.
+
+DEPENDENCY RESOLUTION (includes array):
+The 'includes' array accepts BOTH UUIDs and namespace strings.
+Namespace strings (e.g., "Illuminate\\Http\\JsonResponse") are automatically resolved to UUIDs.
+This works the same as create_file's dependency resolution.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -941,7 +973,7 @@ For <script setup> content, the order in statements array determines output orde
         includes: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of file UUIDs to import',
+          description: 'Array of file UUIDs OR namespace strings to import. Namespace strings (e.g., "Illuminate\\\\Http\\\\JsonResponse") are auto-resolved to UUIDs.',
         },
         models: {
           type: 'array',
@@ -974,12 +1006,16 @@ WARNING: This is destructive and cannot be undone. Make sure the file is not ref
     inputSchema: {
       type: 'object',
       properties: {
+        directory: {
+          type: 'string',
+          description: 'UUID of the directory containing the file (get from get_project directories array or get_file response)',
+        },
         uuid: {
           type: 'string',
           description: 'UUID of the file to delete',
         },
       },
-      required: ['uuid'],
+      required: ['directory', 'uuid'],
     },
   },
   {
@@ -1084,6 +1120,8 @@ Changes are EPHEMERAL (not saved). For persistent changes, use update_element or
 Creates: Model ($fillable, $casts, relationships), Controller (CRUD actions), Service (optional), Migration.
 
 IMPORTANT: Routes are NOT auto-wired. After creation, use create_route with the returned controller UUID and method UUIDs.
+
+IMPORTANT: After creation, check the controller methods for return types and parameter types. If methods use classes not already in includes (e.g., JsonResponse), add those class UUIDs to the controller's includes via save_file.
 
 Response includes controller.methods array with {uuid, name} for each action (index, store, update, destroy).`,
     inputSchema: {
@@ -1402,27 +1440,113 @@ Key concepts:
 
 ## Vue Component Workflow
 
-1. get_project → find 'js' directory UUID
-2. create_file → type='js', extension='vue'
-3. Create statements for imports: "import { ref } from 'vue';" (REQUIRED for ref())
-4. Create statements for data: "const count = ref(0);"
-5. create_method + add_method_body → functions
-6. html_to_elements → template (no 'page' param for components)
-7. update_element → wire click handlers to method UUIDs
-8. save_file with: extension='vue', template=[elementUuid], data=[methodUuids], statements=[importUuids, refUuids]
+1. get_project → find 'js' directory UUID (or create it)
+2. create_file → type='js', extension='vue' for the component
+3. **Create a template route** for editor access:
+   - create_route with name like "notes-template" or "component-name-template"
+   - This route is NOT where the component displays - it's only for accessing the template in the Stellify visual editor
+   - The actual display route (e.g., "/notes") will have just \`<div id="app"></div>\` where Vue mounts
+4. Create statements for imports:
+   - "import { ref, onMounted } from 'vue';" (REQUIRED for ref() and lifecycle hooks)
+   - "import { Http } from 'stellify-framework';" (for API calls)
+   NOTE: The npm package is "stellify-framework" (NOT @stellify/core)
+5. Create statements for reactive data: "const notes = ref([]);"
+6. create_method + add_method_body for functions. Example fetchNotes body:
+   \`\`\`
+   const response = await Http.get('/api/notes');
+   notes.value = response.data || [];
+   \`\`\`
+   **THEN call save_method with is_async: true** (required for methods using await)
+7. Create statement for onMounted: "onMounted(fetchNotes);" (direct method reference, no arrow wrapper)
+8. html_to_elements → template **with page=templateRouteUuid** (attach to the template route for editor access)
+9. update_element → wire click handlers to method UUIDs
+10. save_file with: extension='vue', template=[elementUuid], data=[methodUuids], statements=[importUuids, refUuids, onMountedUuid]
+    - **data = method UUIDs only** (functions)
+    - **statements = statement UUIDs** (imports, refs, onMounted)
+11. **MANDATORY: Create app.js entry file** (see "CRITICAL: JavaScript Entry File" section below)
+12. Create web route for the display page (e.g., "/notes")
+13. **MANDATORY: Add a div with id="app"** to the display page using html_to_elements:
+    - html_to_elements with page=routeUuid and elements='<div id="app"></div>'
+    - This is where Vue mounts the component. Without it, nothing renders!
 
 ## Real-Time UI (broadcast_element_command)
 
 Use for SHOW/DISPLAY/DEMONSTRATE requests - sends instant WebSocket updates to browser.
 Use html_to_elements/update_element for permanent/saved changes.
 
+## CRITICAL: Http Response Handling (Most Common Error)
+
+**This is the #1 cause of "notes not displaying" bugs.**
+
+When fetching data from API endpoints, stellify-framework's Http class returns the JSON body DIRECTLY - it does NOT wrap responses like axios does.
+
+Laravel pagination returns: \`{ data: [...items], current_page: 1, per_page: 15, ... }\`
+
+Since Http.get() returns this JSON directly (no axios wrapper), you access the array with ONE \`.data\`:
+
+\`\`\`javascript
+// CORRECT - Http returns JSON directly, .data gets the paginated array
+const response = await Http.get('/api/notes');
+notes.value = response.data || [];
+
+// WRONG - Double .data (axios habit) - returns undefined, notes stay empty!
+const response = await Http.get('/api/notes');
+notes.value = response.data.data || [];  // BUG: response.data.data is undefined
+\`\`\`
+
+**Why this mistake happens:** With axios, you write \`response.data.data\` because axios wraps the HTTP response (\`response.data\` unwraps axios, then \`.data\` gets the pagination array). Stellify's Http skips the wrapper, so you only need ONE \`.data\`.
+
+**Symptom:** Notes exist in database, API returns them, but UI shows empty list or "No notes yet" message.
+
 ## Common Pitfalls
 
+- **Vue template editor access:** Templates MUST be attached to a route for users to edit them in the visual editor. Create a separate "template route" (e.g., "notes-template") and pass its UUID to html_to_elements. This is different from the display route where the component renders.
+- **Stellify imports:** Use "stellify-framework" package (NOT @stellify/core)
+  CORRECT: import { Http, List, Form } from 'stellify-framework';
+  WRONG: import { Http } from '@stellify/core';
 - v-model requires ref(), NOT Form class: const formData = ref({title: ''})
 - List.from() returns List, not array - use .toArray() for v-for
 - add_method_body APPENDS, doesn't replace - create new method to replace
 - 'data' array = method UUIDs, 'statements' array = import/variable UUIDs
 - For buttons in forms, set inputType: "button" to prevent auto-submit
+- **Async methods:** Methods using await MUST be marked async via save_method with is_async: true
+- **onMounted:** Use direct method reference: "onMounted(fetchNotes);"
+  The assembler automatically outputs lifecycle hooks after method definitions.
+
+## CRITICAL: Nullable Refs and v-if Guards
+
+**This causes "Cannot read properties of null" errors.**
+
+When using a nullable ref (e.g., \`const editingNote = ref(null)\`) with v-model or property access in templates, you MUST guard with an explicit v-if that checks the ref is not null.
+
+**WRONG - v-else does NOT protect against null evaluation:**
+\`\`\`html
+<template v-if="!editingItem">
+  <!-- view mode -->
+</template>
+<template v-else>
+  <input v-model="editingItem.title" />  <!-- ERROR: editingItem could be null -->
+</template>
+\`\`\`
+
+**CORRECT - explicit v-if with null check:**
+\`\`\`html
+<template v-if="!editingItem || editingItem.id !== item.id">
+  <!-- view mode -->
+</template>
+<template v-if="editingItem && editingItem.id === item.id">
+  <input v-model="editingItem.title" />  <!-- Safe: editingItem is guaranteed non-null -->
+</template>
+\`\`\`
+
+**Why v-else fails:** Vue evaluates v-model bindings during compilation/render setup, before the v-else condition is fully applied. The explicit v-if with \`editingItem &&\` ensures the binding is only evaluated when the ref exists.
+
+**Inline editing pattern (CRUD apps):**
+1. Create ref: \`const editingItem = ref(null);\`
+2. View template: \`v-if="!editingItem || editingItem.id !== item.id"\`
+3. Edit template: \`v-if="editingItem && editingItem.id === item.id"\` (NOT v-else!)
+4. Start editing: \`editingItem.value = { ...item };\`
+5. Cancel/save: \`editingItem.value = null;\`
 
 ## Framework Capabilities (Libraries/Packages)
 
@@ -1458,13 +1582,60 @@ When building features, group related files by passing a "module" parameter.
 - create_file(..., module: "blog-posts") - auto-groups file
 - create_route(..., module: "blog-posts") - auto-groups route
 
-Modules are auto-created if they don't exist. This helps users see all code related to a feature grouped together.`;
+Modules are auto-created if they don't exist. This helps users see all code related to a feature grouped together.
+
+## CRITICAL: JavaScript Entry File (app.js)
+
+**You MUST have a JS entry file to register Vue components for use on pages.**
+
+### First component in a project:
+1. Create app.js in the 'js' directory with the component in includes array:
+   - create_file with type='js', extension='js', name='app', includes=[component-file-uuid]
+2. Add statements for NAMED imports only:
+   - "import { createApp } from 'vue';"
+   - "createApp(NotesApp).mount('#app');"
+   NOTE: The component import (NotesApp) is handled by the includes array, NOT a statement!
+3. save_file with statement UUIDs
+
+### Adding more components (app.js already exists):
+1. **search_files** for "app" to find existing app.js
+2. **get_file** to retrieve current includes and statements
+3. Add the new component UUID to the includes array via save_file
+4. Update the mount code to register the new component:
+   - Create new statement: "app.component('Counter', Counter);"
+5. save_file with updated includes and statements arrays
+
+**DO NOT create duplicate app.js files or duplicate createApp imports!**
+**DO NOT use statements for file imports - use the includes array!**
+
+### Page mount point (div#app):
+Each page that uses Vue components needs a \`<div id="app"></div>\`.
+
+- **First time on a page:** html_to_elements(page=routeUuid, elements='<div id="app"></div>')
+- **Page already has it:** Do NOT add another one. Check with get_route first if unsure.
+
+**Without app.js AND div#app, Vue components will NOT render!**
+
+### Import types summary:
+- **File imports (components, classes):** Use \`includes\` array with file UUIDs
+- **Named imports (vue, stellify-framework):** Use statements with add_statement_code
+
+Example app.js structure:
+- includes: [notesAppFileUuid, counterFileUuid]
+- statements: ["import { createApp } from 'vue';", "const app = createApp({});", "app.component('NotesApp', NotesApp);", "app.component('Counter', Counter);", "app.mount('#app');"]
+
+## Efficiency Tips
+
+- **Move elements between routes:** Use \`update_element\` to change \`routeParent\` - don't delete/recreate
+- **Reparent elements:** Update \`parent\` attribute instead of recreating
+- **Reorder children:** Update parent's \`data\` array with new UUID order
+- Always prefer updating over deleting and recreating`;
 
 // Create MCP server
 const server = new Server(
   {
     name: 'stellify-mcp',
-    version: '0.1.22',
+    version: '0.1.25',
   },
   {
     capabilities: {
@@ -1615,15 +1786,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'delete_method': {
-        const { uuid } = args as { uuid: string };
-        const result = await stellify.deleteMethod(uuid);
+        const { file, uuid } = args as { file: string; uuid: string };
+        const result = await stellify.deleteMethod(file, uuid);
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify({
                 success: true,
-                message: `Deleted method ${uuid}`,
+                message: `Deleted method ${uuid} from file ${file}`,
                 data: result,
               }, null, 2),
             },
@@ -1920,8 +2091,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'delete_statement': {
-        const { uuid } = args as { uuid: string };
-        const result = await stellify.deleteStatement(uuid);
+        const { file, method, uuid } = args as { file: string; method: string; uuid: string };
+        const result = await stellify.deleteStatement(file, method, uuid);
         return {
           content: [
             {
@@ -1938,7 +2109,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'save_statement': {
         const { uuid, ...data } = args as any;
-        const result = await stellify.saveStatement(uuid, data);
+        const result = await stellify.saveStatement(uuid, { uuid, ...data });
         return {
           content: [
             {
@@ -1987,15 +2158,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'delete_file': {
-        const { uuid } = args as { uuid: string };
-        const result = await stellify.deleteFile(uuid);
+        const { directory, uuid } = args as { directory: string; uuid: string };
+        const result = await stellify.deleteFile(directory, uuid);
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify({
                 success: true,
-                message: `Deleted file ${uuid}`,
+                message: `Deleted file ${uuid} from directory ${directory}`,
                 data: result,
               }, null, 2),
             },
