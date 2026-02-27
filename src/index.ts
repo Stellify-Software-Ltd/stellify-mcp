@@ -138,10 +138,14 @@ This creates an EMPTY file shell - no methods, statements, or template yet. The 
 
 COMPLETE WORKFLOW:
 1. create_file → creates empty shell, returns file UUID
-2. create_statement + add_statement_code → add variables/imports (returns statement UUIDs)
-3. create_method + add_method_body → add functions (returns method UUIDs)
+2. create_statement_with_code → add variables/imports in ONE call (returns statement UUIDs)
+3. create_method with body param → add functions in ONE call (returns method UUIDs)
 4. html_to_elements → create template elements (returns element UUIDs)
 5. save_file → FINALIZE by wiring template/data arrays with all collected UUIDs
+
+LEGACY (still supported but prefer combined tools above):
+- create_statement + add_statement_code (2 calls instead of 1)
+- create_method + add_method_body + save_method for is_async (3 calls instead of 1)
 
 For PHP: Use type='class', 'model', 'controller', or 'middleware'.
 For Vue: Use type='js' and extension='vue'. Place in the 'js' directory.
@@ -191,11 +195,13 @@ The system resolves these to UUIDs automatically, creating missing dependencies 
   },
   {
     name: 'create_method',
-    description: `Create a method signature in a file. This only creates the method declaration, not the body. Use add_method_body to add implementation.
+    description: `Create a method in a file. Can optionally include the body and async flag in a single call.
+
+**NEW: Combined creation** - You can now pass 'body' and 'is_async' to create the complete method in ONE call instead of three (create_method → add_method_body → save_method).
 
 Parameters are automatically created as clauses. The response includes the clause UUIDs for each parameter.
 
-Example request:
+Example request (simple - signature only):
 {
   "file": "file-uuid",
   "name": "verify",
@@ -207,14 +213,22 @@ Example request:
   ]
 }
 
+Example request (combined - with body and async):
+{
+  "file": "file-uuid",
+  "name": "fetchData",
+  "body": "const response = await Http.get('/api/data');\\nreturn response.data;",
+  "is_async": true
+}
+
 Example response includes:
 {
   "uuid": "method-uuid",
-  "name": "verify",
-  "returnType": "object",
-  "nullable": true,
+  "name": "fetchData",
+  "is_async": true,
   "parameters": ["clause-uuid-for-credentials"],
-  ...
+  "statements": {...},  // Only if body was provided
+  "clauses": {...}      // Only if body was provided
 }`,
     inputSchema: {
       type: 'object',
@@ -235,6 +249,10 @@ Example response includes:
         is_static: {
           type: 'boolean',
           description: 'Whether the method is static (PHP only)',
+        },
+        is_async: {
+          type: 'boolean',
+          description: 'Whether the method is async (JavaScript/Vue only). Set to true for methods that use await.',
         },
         returnType: {
           type: 'string',
@@ -269,6 +287,10 @@ Example response includes:
             },
             required: ['name'],
           },
+        },
+        body: {
+          type: 'string',
+          description: 'Method body code (optional). If provided, automatically parses and adds the code. Example: "const response = await Http.get(\\"/api/data\\");\\nreturn response.data;"',
         },
       },
       required: ['file', 'name'],
@@ -810,6 +832,8 @@ Prefer SVG icons over emoji (encoding issues).`,
     name: 'create_statement',
     description: `Create an empty statement in a file. This is step 1 of 2 - you MUST call add_statement_code next to add the actual code.
 
+**ALTERNATIVE:** Use create_statement_with_code for a single-call approach that combines both steps.
+
 IMPORTANT: This is a TWO-STEP process:
 1. create_statement → returns statement UUID
 2. add_statement_code → adds the actual code to that statement
@@ -834,8 +858,40 @@ For Vue components, include the returned statement UUID in save_file's 'statemen
     },
   },
   {
+    name: 'create_statement_with_code',
+    description: `Create a statement with code in a SINGLE call. This combines create_statement and add_statement_code.
+
+**PREFERRED:** Use this instead of the two-step create_statement → add_statement_code process.
+
+Examples:
+- PHP: "use Illuminate\\Http\\Request;" or "private $items = [];"
+- JS/Vue: "const count = ref(0);" or "import { ref } from 'vue';"
+
+For Vue components, include the returned statement UUID in save_file's 'statements' array (NOT 'data' - that's for methods).`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          description: 'UUID of the file to add the statement to',
+        },
+        code: {
+          type: 'string',
+          description: 'The code for the statement (e.g., "const count = ref(0);")',
+        },
+        method: {
+          type: 'string',
+          description: 'UUID of the method to add the statement to (optional, for method body statements)',
+        },
+      },
+      required: ['file', 'code'],
+    },
+  },
+  {
     name: 'add_statement_code',
     description: `Add code to an existing statement. This is step 2 of 2 - call this AFTER create_statement.
+
+**ALTERNATIVE:** Use create_statement_with_code for a single-call approach.
 
 The statement must already exist (created via create_statement). This parses and stores the code.
 
@@ -1416,7 +1472,7 @@ The response includes actionable suggestions like:
 ];
 
 // Server instructions for tool discovery (used by MCP Tool Search)
-const SERVER_INSTRUCTIONS = `Stellify is a coding platform where you code alongside AI on a codebase maintained and curated by AI. Build Laravel/PHP and Vue.js applications.
+const SERVER_INSTRUCTIONS = `Stellify is a coding platform where you code alongside AI on a codebase maintained and curated by AI. Build Laravel, stellify-framework, and Vue.js applications.
 
 Use Stellify tools when:
 - Building PHP controllers, models, middleware, or classes
@@ -1446,18 +1502,21 @@ Key concepts:
    - create_route with name like "notes-template" or "component-name-template"
    - This route is NOT where the component displays - it's only for accessing the template in the Stellify visual editor
    - The actual display route (e.g., "/notes") will have just \`<div id="app"></div>\` where Vue mounts
-4. Create statements for imports:
-   - "import { ref, onMounted } from 'vue';" (REQUIRED for ref() and lifecycle hooks)
-   - "import { Http } from 'stellify-framework';" (for API calls)
+4. Create statements for imports using **create_statement_with_code** (ONE call each):
+   - create_statement_with_code(file, "import { ref, onMounted } from 'vue';")
+   - create_statement_with_code(file, "import { Http } from 'stellify-framework';")
    NOTE: The npm package is "stellify-framework" (NOT @stellify/core)
-5. Create statements for reactive data: "const notes = ref([]);"
-6. create_method + add_method_body for functions. Example fetchNotes body:
+5. Create statements for reactive data: create_statement_with_code(file, "const notes = ref([]);")
+6. **create_method with body and is_async** (ONE call instead of three). Example:
    \`\`\`
-   const response = await Http.get('/api/notes');
-   notes.value = response.data || [];
+   create_method({
+     file: fileUuid,
+     name: "fetchNotes",
+     body: "const response = await Http.get('/api/notes');\\nnotes.value = response.data || [];",
+     is_async: true
+   })
    \`\`\`
-   **THEN call save_method with is_async: true** (required for methods using await)
-7. Create statement for onMounted: "onMounted(fetchNotes);" (direct method reference, no arrow wrapper)
+7. Create statement for onMounted: create_statement_with_code(file, "onMounted(fetchNotes);")
 8. html_to_elements → template **with page=templateRouteUuid** (attach to the template route for editor access)
 9. update_element → wire click handlers to method UUIDs
 10. save_file with: extension='vue', template=[elementUuid], data=[methodUuids], statements=[importUuids, refUuids, onMountedUuid]
@@ -1509,7 +1568,7 @@ notes.value = response.data.data || [];  // BUG: response.data.data is undefined
 - add_method_body APPENDS, doesn't replace - create new method to replace
 - 'data' array = method UUIDs, 'statements' array = import/variable UUIDs
 - For buttons in forms, set inputType: "button" to prevent auto-submit
-- **Async methods:** Methods using await MUST be marked async via save_method with is_async: true
+- **Async methods:** Methods using await MUST be marked async. Use is_async: true in create_method (preferred) or save_method
 - **onMounted:** Use direct method reference: "onMounted(fetchNotes);"
   The assembler automatically outputs lifecycle hooks after method definitions.
 
@@ -1548,32 +1607,11 @@ When using a nullable ref (e.g., \`const editingNote = ref(null)\`) with v-model
 4. Start editing: \`editingItem.value = { ...item };\`
 5. Cancel/save: \`editingItem.value = null;\`
 
-## Framework Capabilities (Libraries/Packages)
+## Stack and Business Logic
 
-**CRITICAL: You write BUSINESS LOGIC only. Capabilities are installed packages/libraries (Sanctum, Stripe, AWS SDK, etc.) that Stellify provides. You CANNOT create these by writing code.**
+**Default stack:** Laravel (PHP), stellify-framework (JS), and Vue.js. Available capabilities (optional packages/libraries) are returned by \`get_project\`. Use \`get_stellify_framework_api\` for the stellify-framework API reference.
 
-Examples of capabilities (packages you cannot write):
-- Authentication: laravel/sanctum, laravel/socialite
-- Payments: stripe/stripe-php
-- Storage: aws/aws-sdk-php, league/flysystem-aws-s3-v3
-- Email: mailgun/mailgun-php, aws/aws-sdk-php (SES)
-- Search: meilisearch/meilisearch-php, algolia/algoliasearch-client-php
-- WebSocket: laravel/reverb
-
-**WORKFLOW:**
-
-1. When a user requests functionality that might need a package/library, check the capabilities list from get_project FIRST.
-
-2. If status is "available" → package is installed, proceed with business logic.
-
-3. If status is "needs_config" → package installed but needs API keys. INFORM THE USER to configure it in Project Settings.
-
-4. If status is "not_available" or doesn't exist:
-   - STOP IMMEDIATELY
-   - Call request_capability() to log it
-   - INFORM THE USER: "This feature requires the [X] package which isn't installed in Stellify yet. I've logged a request. This cannot be built until the package is added."
-
-**NEVER write code that belongs in a package.** If you find yourself writing OAuth flows, payment processing, S3 clients, email transport, search indexing, or similar infrastructure - STOP. That's a capability request, not business logic.
+**All business logic** (controllers, models, middleware, etc.) goes in the tenant DB via MCP tools. If a required capability is not available, use \`request_capability\` to log it.
 
 ## Project Modules (Code Organization)
 
@@ -1723,15 +1761,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'create_method': {
         const result = await stellify.createMethod(args as any);
         const methodData = result.data || result;
+        const hasBody = !!(args as any).body;
+
+        const response: any = {
+          success: true,
+          message: hasBody
+            ? `Created method "${(args as any).name}" with body (UUID: ${methodData.uuid})`
+            : `Created method "${(args as any).name}" (UUID: ${methodData.uuid})`,
+          method: methodData,
+        };
+
+        // Include statements and clauses if body was provided
+        if (result.statements) {
+          response.statements = result.statements;
+        }
+        if (result.clauses) {
+          response.clauses = result.clauses;
+        }
+
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({
-                success: true,
-                message: `Created method "${(args as any).name}" (UUID: ${methodData.uuid})`,
-                method: methodData,
-              }, null, 2),
+              text: JSON.stringify(response, null, 2),
             },
           ],
         };
@@ -2068,6 +2120,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 success: true,
                 message: `Created statement (${result.data?.uuid || result.uuid})`,
                 statement: result.data || result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'create_statement_with_code': {
+        const result = await stellify.createStatementWithCode(args as any);
+        const statementData = result.data || result;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Created statement with code (UUID: ${statementData.uuid})`,
+                statement: statementData.statement || statementData,
+                statements: statementData.statements,
+                clauses: statementData.clauses,
               }, null, 2),
             },
           ],

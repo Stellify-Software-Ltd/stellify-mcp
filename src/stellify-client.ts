@@ -20,11 +20,16 @@ export interface CreateMethodParams {
   name: string;
   visibility?: 'public' | 'protected' | 'private';
   is_static?: boolean;
+  is_async?: boolean; // NEW: Set to true for async methods (Vue/JS methods using await)
   returnType?: string;
+  nullable?: boolean;
   parameters?: Array<{
     name: string;
-    type: string;
+    type?: string;
+    datatype?: string;
+    value?: string;
   }>;
+  body?: string; // NEW: Method body code - if provided, automatically parses and adds code
 }
 
 export interface AddMethodBodyParams {
@@ -146,6 +151,12 @@ export class StellifyClient {
 
   async createStatement(params: { file?: string; method?: string }) {
     const response = await this.client.post('/statement', params);
+    return response.data;
+  }
+
+  // NEW: Combined create statement with code in a single call
+  async createStatementWithCode(params: { file: string; code: string; method?: string }) {
+    const response = await this.client.post('/statement/with-code', params);
     return response.data;
   }
 
