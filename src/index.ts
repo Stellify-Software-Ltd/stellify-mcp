@@ -36,7 +36,7 @@ const STELLIFY_FRAMEWORK_API = {
   List: ['create', 'from', 'range', 'add', 'remove', 'removeWhere', 'set', 'get', 'first', 'last', 'sort', 'sortBy', 'reverse', 'filter', 'find', 'findIndex', 'map', 'reduce', 'forEach', 'includes', 'indexOf', 'every', 'some', 'slice', 'take', 'skip', 'chunk', 'unique', 'uniqueBy', 'groupBy', 'flatten', 'concat', 'isEmpty', 'isNotEmpty', 'count', 'clear', 'toArray', 'toJSON', 'clone', 'sum', 'avg', 'min', 'max'],
   Tree: ['create', 'setRoot', 'addChild', 'removeNode', 'getNode', 'getRoot', 'getChildren', 'getParent', 'getSiblings', 'getAncestors', 'getDescendants', 'getDepth', 'getPath', 'traverse', 'find', 'findAll', 'move', 'toArray', 'size'],
   // Network
-  Http: ['create', 'get', 'post', 'put', 'patch', 'delete', 'withHeaders', 'withToken', 'withTimeout'],
+  Http: ['create', 'get', 'post', 'put', 'patch', 'delete', 'items', 'withHeaders', 'withToken', 'withTimeout'],
   Socket: ['create', 'connect', 'disconnect', 'send', 'sendEvent', 'on', 'off', 'once', 'isConnected', 'getState'],
   Auth: ['create', 'login', 'logout', 'fetchUser', 'getUser', 'getToken', 'isAuthenticated', 'setToken', 'setUser', 'refresh', 'onAuthChange', 'offAuthChange', 'getAuthHeader'],
   Stream: ['create', 'headers', 'withToken', 'onChunk', 'onComplete', 'onError', 'get', 'post', 'abort', 'getBuffer', 'getChunks', 'isStreaming', 'clear'],
@@ -88,12 +88,8 @@ The npm package is "stellify-framework" (NOT @stellify/core).
 Import like: import { Http, List, Form } from 'stellify-framework';
 
 IMPORTANT - List class and Vue reactivity:
-The List class methods return List instances, NOT plain arrays.
-Vue's v-for directive cannot iterate over List instances directly.
-
-When assigning to a Vue ref that will be used with v-for, call .toArray():
-- CORRECT: notes.value = List.from(response.data).toArray();
-- INCORRECT (v-for won't work): notes.value = List.from(response.data);
+List is iterable and works directly with Vue's v-for directive.
+Use List.from() to wrap arrays for chainable operations (filter, map, sort, etc.).
 
 Example response:
 {
@@ -149,13 +145,16 @@ LEGACY (still supported but prefer combined tools above):
 
 For PHP: Use type='class', 'model', 'controller', or 'middleware'.
 For Vue: Use type='js' and extension='vue'. Place in the 'js' directory.
+  - Auto-creates app.js (check response.appJs)
+  - Auto-creates template route for visual editor (check response.templateRoute.uuid)
 
 DEPENDENCY RESOLUTION (automatic):
-Pass 'includes' as an array of namespace strings (e.g., ["App\\Models\\User", "Illuminate\\Support\\Facades\\Hash"]).
-The system resolves these to UUIDs automatically, creating missing dependencies on-demand:
-- App\\* classes → creates stub file in your project (tenant DB)
+Pass 'includes' as an array of namespace strings for FRAMEWORK classes (e.g., ["Illuminate\\Http\\Request", "Illuminate\\Support\\Facades\\Hash"]).
+The system resolves these to UUIDs automatically:
 - Illuminate\\*/Laravel\\* → fetches from Laravel API, creates in Application DB
-- Vendor packages → fetches from vendor, creates in Application DB`,
+- Vendor packages → fetches from vendor, creates in Application DB
+
+NOTE: For controllers that use PROJECT models (Feedback, Vote, etc.), add those to the 'models' array in save_file instead. Do NOT put project models in includes - this causes duplicate use statement errors.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -197,7 +196,7 @@ The system resolves these to UUIDs automatically, creating missing dependencies 
     name: 'create_method',
     description: `Create a method in a file. Can optionally include the body and async flag in a single call.
 
-**NEW: Combined creation** - You can now pass 'body' and 'is_async' to create the complete method in ONE call instead of three (create_method → add_method_body → save_method).
+**NEW: Combined creation** - Pass 'body' to create the complete method in ONE call. Async is auto-detected when body contains \`await\`.
 
 Parameters are automatically created as clauses. The response includes the clause UUIDs for each parameter.
 
@@ -213,12 +212,11 @@ Example request (simple - signature only):
   ]
 }
 
-Example request (combined - with body and async):
+Example request (combined - with body, async auto-detected):
 {
   "file": "file-uuid",
   "name": "fetchData",
-  "body": "const response = await Http.get('/api/data');\\nreturn response.data;",
-  "is_async": true
+  "body": "const response = await Http.get('/api/data');\\nreturn response.data;"
 }
 
 Example response includes:
@@ -467,7 +465,9 @@ Example - Remove duplicate/unwanted statements:
   },
   {
     name: 'create_route',
-    description: `Create a route/page. For API routes, pass controller and controller_method UUIDs to wire execution.
+    description: `Create a route/page. For API routes, you MUST pass BOTH controller AND controller_method UUIDs to wire execution.
+
+IMPORTANT: Both 'controller' (file UUID) and 'controller_method' (method UUID) are required together for API routes to execute code. Without both, the route won't run any code.
 
 Route params like {id} auto-inject into controller method parameters when names match.`,
     inputSchema: {
@@ -499,11 +499,11 @@ Route params like {id} auto-inject into controller method parameters when names 
         },
         controller: {
           type: 'string',
-          description: 'UUID of the controller file to handle this route. Required for API routes to execute code.',
+          description: 'UUID of the controller file. MUST be provided together with controller_method for API routes to execute code.',
         },
         controller_method: {
           type: 'string',
-          description: 'UUID of the method within the controller to execute. Required for API routes to execute code.',
+          description: 'UUID of the method to execute. MUST be provided together with controller for API routes to execute code.',
         },
         data: {
           type: 'object',
@@ -538,6 +538,7 @@ Use this to look up a route you created or to find existing routes in the projec
     description: `Update an existing route/page. Use this to wire a route to a controller method.
 
 IMPORTANT: This is how you connect API routes to controller methods!
+IMPORTANT: You MUST provide BOTH controller AND controller_method together - they are a pair.
 
 Example - Wire an API route to a controller method:
 {
@@ -547,8 +548,8 @@ Example - Wire an API route to a controller method:
 }
 
 Available fields:
-- controller: UUID of the controller file
-- controller_method: UUID of the method to execute
+- controller: UUID of the controller file (MUST be paired with controller_method)
+- controller_method: UUID of the method to execute (MUST be paired with controller)
 - path: URL path
 - name: Route name
 - type: "web" or "api"
@@ -564,11 +565,11 @@ Available fields:
         },
         controller: {
           type: 'string',
-          description: 'UUID of the controller file to handle this route',
+          description: 'UUID of the controller file. MUST be provided together with controller_method.',
         },
         controller_method: {
           type: 'string',
-          description: 'UUID of the method within the controller to execute',
+          description: 'UUID of the method to execute. MUST be provided together with controller.',
         },
         path: {
           type: 'string',
@@ -690,11 +691,22 @@ Generates: <div class="card p-4" v-for="note in notes" :key="note.id">`,
     name: 'update_element',
     description: `Update a UI element's attributes.
 
-Pass data object with: tag, classes (array), text, variable (for v-model), and event handlers (click, submit, etc. = method UUID).
+Pass data object with: tag, classes (array), text, variable (for v-model), and event handlers.
 
 Key fields: inputType (not 'type') for button/input HTML type. clickArgs for handler arguments in v-for loops.
 
-Event handlers: click, submit, change, input, focus, blur, keydown, keyup, mouseenter, mouseleave.`,
+EVENT HANDLERS - Use method UUIDs:
+{ "click": "method-uuid" } → @click="methodName"
+{ "click": "method-uuid", "clickArgs": "item" } → @click="methodName(item)"
+
+Create methods for all handlers, including simple state changes like opening modals or toggling flags.
+
+Event types: click, submit, change, input, focus, blur, keydown, keyup, mouseenter, mouseleave.
+
+EFFICIENCY - Prefer updates over delete/recreate:
+- Move between routes: change \`routeParent\` attribute
+- Reparent elements: change \`parent\` attribute
+- Reorder children: update parent's \`data\` array with new UUID order`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -787,6 +799,8 @@ Note: To reorder elements, use update_element to modify the parent element's 'da
 
 Auto-detects Vue bindings ({{ var }}). For Vue components, omit 'page'. For pages, provide route UUID.
 
+**@click auto-wiring:** Pass 'file' UUID to auto-resolve @click="methodName" handlers. Methods must exist in the file first.
+
 Prefer SVG icons over emoji (encoding issues).`,
     inputSchema: {
       type: 'object',
@@ -802,6 +816,10 @@ Prefer SVG icons over emoji (encoding issues).`,
         selection: {
           type: 'string',
           description: 'Parent element UUID to attach to (alternative to page)',
+        },
+        file: {
+          type: 'string',
+          description: 'Vue component file UUID. Pass this to auto-wire @click handlers to method UUIDs.',
         },
         test: {
           type: 'boolean',
@@ -1029,12 +1047,12 @@ This works the same as create_file's dependency resolution.`,
         includes: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of file UUIDs OR namespace strings to import. Namespace strings (e.g., "Illuminate\\\\Http\\\\JsonResponse") are auto-resolved to UUIDs.',
+          description: 'Array of file UUIDs OR namespace strings for FRAMEWORK classes only (Request, JsonResponse, etc.). Do NOT put project models here - use the models array instead.',
         },
         models: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of model file UUIDs that this controller uses (required for model class loading)',
+          description: 'Array of model file UUIDs for PROJECT models (Feedback, Vote, etc.). These get sandbox namespace automatically. Do NOT also add these to includes or you will get duplicate use statement errors.',
         },
       },
       required: ['uuid', 'name', 'type'],
@@ -1498,114 +1516,72 @@ Key concepts:
 
 1. get_project → find 'js' directory UUID (or create it)
 2. create_file → type='js', extension='vue' for the component
-3. **Create a template route** for editor access:
-   - create_route with name like "notes-template" or "component-name-template"
-   - This route is NOT where the component displays - it's only for accessing the template in the Stellify visual editor
-   - The actual display route (e.g., "/notes") will have just \`<div id="app"></div>\` where Vue mounts
-4. Create statements for imports using **create_statement_with_code** (ONE call each):
+   - **Auto-creates app.js** and **template route** (check response for appJs and templateRoute fields)
+3. Create statements for imports using **create_statement_with_code** (ONE call each):
    - create_statement_with_code(file, "import { ref, onMounted } from 'vue';")
    - create_statement_with_code(file, "import { Http } from 'stellify-framework';")
-   NOTE: The npm package is "stellify-framework" (NOT @stellify/core)
-5. Create statements for reactive data: create_statement_with_code(file, "const notes = ref([]);")
-6. **create_method with body and is_async** (ONE call instead of three). Example:
+4. Create statements for reactive data: create_statement_with_code(file, "const notes = ref([]);")
+5. **create_method with body** (async auto-detected from \`await\`). Example:
    \`\`\`
    create_method({
      file: fileUuid,
      name: "fetchNotes",
-     body: "const response = await Http.get('/api/notes');\\nnotes.value = response.data || [];",
-     is_async: true
+     body: "const response = await Http.get('/api/notes');\\nnotes.value = response.data || [];"
    })
    \`\`\`
-7. Create statement for onMounted: create_statement_with_code(file, "onMounted(fetchNotes);")
-8. html_to_elements → template **with page=templateRouteUuid** (attach to the template route for editor access)
-9. update_element → wire click handlers to method UUIDs
-10. save_file with: extension='vue', template=[elementUuid], data=[methodUuids], statements=[importUuids, refUuids, onMountedUuid]
-    - **data = method UUIDs only** (functions)
-    - **statements = statement UUIDs** (imports, refs, onMounted)
-11. **MANDATORY: Create app.js entry file** (see "CRITICAL: JavaScript Entry File" section below)
-12. Create web route for the display page (e.g., "/notes")
-13. **MANDATORY: Add a div with id="app"** to the display page using html_to_elements:
-    - html_to_elements with page=routeUuid and elements='<div id="app"></div>'
-    - This is where Vue mounts the component. Without it, nothing renders!
+6. Create statement for onMounted: create_statement_with_code(file, "onMounted(fetchData);")
+7. **Create UI interaction methods** for any button that changes state:
+   \`\`\`
+   create_method({ file: fileUuid, name: "openModal", body: "showModal.value = true;" })
+   create_method({ file: fileUuid, name: "closeModal", body: "showModal.value = false;" })
+   \`\`\`
+8. html_to_elements with @click handlers auto-wired:
+   \`\`\`
+   html_to_elements({
+     elements: '<button @click="openModal">Open</button>',
+     page: templateRoute.uuid,
+     file: fileUuid  // Auto-wires @click="openModal" to the method UUID
+   })
+   \`\`\`
+9. save_file with: extension='vue', template=[elementUuid], data=[methodUuids], statements=[importUuids, refUuids, onMountedUuid]
+11. Create web route for the display page (e.g., "/notes")
+12. Add \`<div id="app"></div>\` to the display page: html_to_elements(page=routeUuid, elements='<div id="app"></div>')
 
-## Real-Time UI (broadcast_element_command)
+## Fetching Paginated Data
 
-Use for SHOW/DISPLAY/DEMONSTRATE requests - sends instant WebSocket updates to browser.
-Use html_to_elements/update_element for permanent/saved changes.
-
-## CRITICAL: Http Response Handling (Most Common Error)
-
-**This is the #1 cause of "notes not displaying" bugs.**
-
-When fetching data from API endpoints, stellify-framework's Http class returns the JSON body DIRECTLY - it does NOT wrap responses like axios does.
-
-Laravel pagination returns: \`{ data: [...items], current_page: 1, per_page: 15, ... }\`
-
-Since Http.get() returns this JSON directly (no axios wrapper), you access the array with ONE \`.data\`:
+Use \`Http.items()\` for paginated endpoints - it auto-extracts the array from Laravel responses:
 
 \`\`\`javascript
-// CORRECT - Http returns JSON directly, .data gets the paginated array
+// Recommended - auto-extracts .data from paginated response
+notes.value = await Http.items('/api/notes');
+
+// Alternative - manual extraction
 const response = await Http.get('/api/notes');
 notes.value = response.data || [];
-
-// WRONG - Double .data (axios habit) - returns undefined, notes stay empty!
-const response = await Http.get('/api/notes');
-notes.value = response.data.data || [];  // BUG: response.data.data is undefined
 \`\`\`
-
-**Why this mistake happens:** With axios, you write \`response.data.data\` because axios wraps the HTTP response (\`response.data\` unwraps axios, then \`.data\` gets the pagination array). Stellify's Http skips the wrapper, so you only need ONE \`.data\`.
-
-**Symptom:** Notes exist in database, API returns them, but UI shows empty list or "No notes yet" message.
 
 ## Common Pitfalls
 
-- **Vue template editor access:** Templates MUST be attached to a route for users to edit them in the visual editor. Create a separate "template route" (e.g., "notes-template") and pass its UUID to html_to_elements. This is different from the display route where the component renders.
+- **@click auto-wiring:** Pass the file UUID to html_to_elements to auto-wire @click handlers. Methods must be created BEFORE calling html_to_elements.
 - **Stellify imports:** Use "stellify-framework" package (NOT @stellify/core)
   CORRECT: import { Http, List, Form } from 'stellify-framework';
   WRONG: import { Http } from '@stellify/core';
 - v-model requires ref(), NOT Form class: const formData = ref({title: ''})
-- List.from() returns List, not array - use .toArray() for v-for
+- List is iterable and works directly with v-for (no .toArray() needed)
 - add_method_body APPENDS, doesn't replace - create new method to replace
 - 'data' array = method UUIDs, 'statements' array = import/variable UUIDs
 - For buttons in forms, set inputType: "button" to prevent auto-submit
-- **Async methods:** Methods using await MUST be marked async. Use is_async: true in create_method (preferred) or save_method
+- **Async methods:** Auto-detected when body contains \`await\`. Response includes \`is_async: true\` if detected.
 - **onMounted:** Use direct method reference: "onMounted(fetchNotes);"
   The assembler automatically outputs lifecycle hooks after method definitions.
 
-## CRITICAL: Nullable Refs and v-if Guards
+## Nullable Refs: Use explicit v-if, NOT v-else
 
-**This causes "Cannot read properties of null" errors.**
+When using nullable refs (e.g., \`const editingItem = ref(null)\`) with v-model, use explicit v-if guards:
+- WRONG: \`<template v-else><input v-model="editingItem.title"/></template>\`
+- CORRECT: \`<template v-if="editingItem && editingItem.id === item.id"><input v-model="editingItem.title"/></template>\`
 
-When using a nullable ref (e.g., \`const editingNote = ref(null)\`) with v-model or property access in templates, you MUST guard with an explicit v-if that checks the ref is not null.
-
-**WRONG - v-else does NOT protect against null evaluation:**
-\`\`\`html
-<template v-if="!editingItem">
-  <!-- view mode -->
-</template>
-<template v-else>
-  <input v-model="editingItem.title" />  <!-- ERROR: editingItem could be null -->
-</template>
-\`\`\`
-
-**CORRECT - explicit v-if with null check:**
-\`\`\`html
-<template v-if="!editingItem || editingItem.id !== item.id">
-  <!-- view mode -->
-</template>
-<template v-if="editingItem && editingItem.id === item.id">
-  <input v-model="editingItem.title" />  <!-- Safe: editingItem is guaranteed non-null -->
-</template>
-\`\`\`
-
-**Why v-else fails:** Vue evaluates v-model bindings during compilation/render setup, before the v-else condition is fully applied. The explicit v-if with \`editingItem &&\` ensures the binding is only evaluated when the ref exists.
-
-**Inline editing pattern (CRUD apps):**
-1. Create ref: \`const editingItem = ref(null);\`
-2. View template: \`v-if="!editingItem || editingItem.id !== item.id"\`
-3. Edit template: \`v-if="editingItem && editingItem.id === item.id"\` (NOT v-else!)
-4. Start editing: \`editingItem.value = { ...item };\`
-5. Cancel/save: \`editingItem.value = null;\`
+Vue evaluates v-model bindings before v-else is applied, causing "Cannot read properties of null" errors.
 
 ## Stack and Business Logic
 
@@ -1613,61 +1589,12 @@ When using a nullable ref (e.g., \`const editingNote = ref(null)\`) with v-model
 
 **All business logic** (controllers, models, middleware, etc.) goes in the tenant DB via MCP tools. If a required capability is not available, use \`request_capability\` to log it.
 
-## Project Modules (Code Organization)
+## JavaScript Entry File (app.js) - Auto-Generated
 
-When building features, group related files by passing a "module" parameter.
+When you create a Vue component, **app.js is automatically created/updated** with component registration. The create_file response will confirm this with an \`appJs\` field.
 
-- create_file(..., module: "blog-posts") - auto-groups file
-- create_route(..., module: "blog-posts") - auto-groups route
-
-Modules are auto-created if they don't exist. This helps users see all code related to a feature grouped together.
-
-## CRITICAL: JavaScript Entry File (app.js)
-
-**You MUST have a JS entry file to register Vue components for use on pages.**
-
-### First component in a project:
-1. Create app.js in the 'js' directory with the component in includes array:
-   - create_file with type='js', extension='js', name='app', includes=[component-file-uuid]
-2. Add statements for NAMED imports only:
-   - "import { createApp } from 'vue';"
-   - "createApp(NotesApp).mount('#app');"
-   NOTE: The component import (NotesApp) is handled by the includes array, NOT a statement!
-3. save_file with statement UUIDs
-
-### Adding more components (app.js already exists):
-1. **search_files** for "app" to find existing app.js
-2. **get_file** to retrieve current includes and statements
-3. Add the new component UUID to the includes array via save_file
-4. Update the mount code to register the new component:
-   - Create new statement: "app.component('Counter', Counter);"
-5. save_file with updated includes and statements arrays
-
-**DO NOT create duplicate app.js files or duplicate createApp imports!**
-**DO NOT use statements for file imports - use the includes array!**
-
-### Page mount point (div#app):
-Each page that uses Vue components needs a \`<div id="app"></div>\`.
-
-- **First time on a page:** html_to_elements(page=routeUuid, elements='<div id="app"></div>')
-- **Page already has it:** Do NOT add another one. Check with get_route first if unsure.
-
-**Without app.js AND div#app, Vue components will NOT render!**
-
-### Import types summary:
-- **File imports (components, classes):** Use \`includes\` array with file UUIDs
-- **Named imports (vue, stellify-framework):** Use statements with add_statement_code
-
-Example app.js structure:
-- includes: [notesAppFileUuid, counterFileUuid]
-- statements: ["import { createApp } from 'vue';", "const app = createApp({});", "app.component('NotesApp', NotesApp);", "app.component('Counter', Counter);", "app.mount('#app');"]
-
-## Efficiency Tips
-
-- **Move elements between routes:** Use \`update_element\` to change \`routeParent\` - don't delete/recreate
-- **Reparent elements:** Update \`parent\` attribute instead of recreating
-- **Reorder children:** Update parent's \`data\` array with new UUID order
-- Always prefer updating over deleting and recreating`;
+**Page mount point:** Each page using Vue needs \`<div id="app"></div>\`:
+- html_to_elements(page=routeUuid, elements='<div id="app"></div>')`;
 
 // Create MCP server
 const server = new Server(
@@ -1744,14 +1671,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'create_file': {
         const result = await stellify.createFile(args as any);
         const fileData = result.data || result;
+        const appJs = fileData.appJs || result.appJs;
+
+        let message = `Created file "${(args as any).name}" (UUID: ${fileData.uuid})`;
+        if (appJs?.created) {
+          message += `. Auto-created app.js (UUID: ${appJs.uuid}) with component registration.`;
+        } else if (appJs?.updated) {
+          message += `. Auto-updated app.js to include this component.`;
+        }
+
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify({
                 success: true,
-                message: `Created file "${(args as any).name}" (UUID: ${fileData.uuid})`,
+                message,
                 file: fileData,
+                appJs: appJs || null,
               }, null, 2),
             },
           ],

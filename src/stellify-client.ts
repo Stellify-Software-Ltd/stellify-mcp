@@ -239,6 +239,7 @@ export class StellifyClient {
     elements: string;
     page?: string;
     selection?: string;
+    file?: string;
     test?: boolean;
   }) {
     const response = await this.client.post('/html/elements', params);
