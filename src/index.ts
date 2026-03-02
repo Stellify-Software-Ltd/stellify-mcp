@@ -1600,7 +1600,7 @@ When you create a Vue component, **app.js is automatically created/updated** wit
 const server = new Server(
   {
     name: 'stellify-mcp',
-    version: '0.1.26',
+    version: '0.1.27',
   },
   {
     capabilities: {
