@@ -198,6 +198,8 @@ NOTE: For controllers that use PROJECT models (Feedback, Vote, etc.), add those 
 
 **NEW: Combined creation** - Pass 'body' to create the complete method in ONE call. Async is auto-detected when body contains \`await\`.
 
+**Nested code is handled correctly.** The parser tracks brace/bracket/paren depth and only splits statements on semicolons at the top level. This means computed properties, arrow functions with block bodies, and other nested constructs work correctly as single statements.
+
 Parameters are automatically created as clauses. The response includes the clause UUIDs for each parameter.
 
 Example request (simple - signature only):
@@ -297,6 +299,8 @@ Example response includes:
   {
     name: 'add_method_body',
     description: `Parse and add PHP code to a method body. Provide the method implementation code (without the function declaration). Stellify will parse it into structured statements.
+
+**Nested code is handled correctly.** The parser tracks brace/bracket/paren depth and only splits on semicolons at the top level. Arrow functions with block bodies, computed properties, and other nested constructs work as single statements.
 
 IMPORTANT: This APPENDS to existing method statements. To REPLACE a method's code:
 1. Create a NEW method with create_method
@@ -881,11 +885,13 @@ For Vue components, include the returned statement UUID in save_file's 'statemen
 
 **PREFERRED:** Use this instead of the two-step create_statement → add_statement_code process.
 
+**Nested code is handled correctly.** The parser tracks brace/bracket/paren depth and only splits on top-level semicolons. Computed properties, arrow functions with block bodies, and other nested constructs are kept as single statements.
+
 Examples:
 - PHP: "use Illuminate\\Http\\Request;" or "private $items = [];"
 - JS/Vue: "const count = ref(0);" or "import { ref } from 'vue';"
 
-For Vue components, include the returned statement UUID in save_file's 'statements' array (NOT 'data' - that's for methods).`,
+For Vue components, include the returned statement UUIDs in save_file's 'statements' array (NOT 'data' - that's for methods).`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -909,7 +915,7 @@ For Vue components, include the returned statement UUID in save_file's 'statemen
     name: 'add_statement_code',
     description: `Add code to an existing statement. This is step 2 of 2 - call this AFTER create_statement.
 
-**ALTERNATIVE:** Use create_statement_with_code for a single-call approach.
+**ALTERNATIVE:** Use create_statement_with_code for a single-call approach that combines both steps.
 
 The statement must already exist (created via create_statement). This parses and stores the code.
 
@@ -1487,6 +1493,111 @@ The response includes actionable suggestions like:
       },
     },
   },
+  {
+    name: 'get_setting',
+    description: `Get a setting/config value from the tenant's settings table.
+
+These settings are read by the config() function in sandbox code execution.
+Use this to check existing configuration values before modifying them.
+
+EXAMPLE:
+{ "name": "app" }
+
+Returns the setting data as key-value pairs, e.g.:
+{
+  "name": "My App",
+  "timezone": "UTC",
+  "locale": "en"
+}
+
+Common setting profiles:
+- "app": Application settings (name, timezone, locale)
+- "database": Database connection settings
+- "mail": Mail configuration
+- "cache": Cache settings
+- Custom profiles for app-specific config`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Setting profile name (e.g., "app", "database", "mail", or custom names like "vote")',
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'save_setting',
+    description: `Create or update a setting in the tenant's settings table.
+
+These settings are accessible via config() in sandbox code execution.
+Use this to configure application behavior, API keys, feature flags, etc.
+
+IMPORTANT: This creates or updates the setting profile with the provided key-value data.
+The data is merged with any existing values for that profile.
+
+EXAMPLE - Create app settings:
+{
+  "name": "app",
+  "data": {
+    "name": "My Feedback App",
+    "timezone": "America/New_York",
+    "locale": "en"
+  }
+}
+
+EXAMPLE - Create custom settings for voting:
+{
+  "name": "vote",
+  "data": {
+    "salt": "my-secret-salt-for-ip-hashing",
+    "allow_anonymous": true,
+    "max_votes_per_day": 10
+  }
+}
+
+In your controller code, access these with:
+- config('app.name') returns "My Feedback App"
+- config('vote.salt') returns "my-secret-salt-for-ip-hashing"
+- config('vote.allow_anonymous') returns true`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Setting profile name (e.g., "app", "vote", "features")',
+        },
+        data: {
+          type: 'object',
+          description: 'Key-value pairs for the setting (e.g., { "salt": "secret", "enabled": true })',
+        },
+      },
+      required: ['name', 'data'],
+    },
+  },
+  {
+    name: 'delete_setting',
+    description: `Delete a setting profile from the tenant's settings table.
+
+WARNING: This permanently removes the entire setting profile and all its values.
+This cannot be undone.
+
+EXAMPLE:
+{ "name": "vote" }
+
+This removes the "vote" setting profile entirely.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Setting profile name to delete',
+        },
+      },
+      required: ['name'],
+    },
+  },
 ];
 
 // Server instructions for tool discovery (used by MCP Tool Search)
@@ -1559,6 +1670,10 @@ notes.value = await Http.items('/api/notes');
 const response = await Http.get('/api/notes');
 notes.value = response.data || [];
 \`\`\`
+
+## Editing Existing Code
+
+- **Edit at the right level:** To change code, edit the statement or clause - never delete an entire method just to change a line.
 
 ## Common Pitfalls
 
@@ -2418,6 +2533,55 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 message,
                 analysis_type: analysisType,
                 data,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_setting': {
+        const result = await stellify.getSetting((args as any).name);
+        const data = result.data || result;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Retrieved setting "${(args as any).name}"`,
+                setting: data,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'save_setting': {
+        const { name, data } = args as { name: string; data: Record<string, any> };
+        await stellify.saveSetting(name, data);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Saved setting "${name}" with ${Object.keys(data).length} key(s)`,
+                keys: Object.keys(data),
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'delete_setting': {
+        await stellify.deleteSetting((args as any).name);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Deleted setting "${(args as any).name}"`,
               }, null, 2),
             },
           ],

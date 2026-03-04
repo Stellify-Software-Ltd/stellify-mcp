@@ -384,4 +384,27 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Settings/Config management - for tenant-specific configuration
+  // These settings are read by the config() override in sandbox code execution
+
+  async getSetting(name: string) {
+    const response = await this.client.get(`/config/${name}`);
+    return response.data;
+  }
+
+  async saveSetting(name: string, data: Record<string, any>) {
+    const response = await this.client.put(`/config/${name}`, { data });
+    return response.data;
+  }
+
+  async createSetting(name: string) {
+    const response = await this.client.post('/config', { name });
+    return response.data;
+  }
+
+  async deleteSetting(name: string) {
+    const response = await this.client.delete(`/config/${name}`);
+    return response.data;
+  }
+
 }
