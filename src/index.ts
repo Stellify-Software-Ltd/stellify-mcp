@@ -1704,6 +1704,8 @@ Vue evaluates v-model bindings before v-else is applied, causing "Cannot read pr
 
 **All business logic** (controllers, models, middleware, etc.) goes in the tenant DB via MCP tools. If a required capability is not available, use \`request_capability\` to log it.
 
+**Prefer Laravel methods:** When Laravel provides a helper (Str, Arr, Hash, Number, Collection), use it instead of native PHP functions.
+
 ## JavaScript Entry File (app.js) - Auto-Generated
 
 When you create a Vue component, **app.js is automatically created/updated** with component registration. The create_file response will confirm this with an \`appJs\` field.
@@ -1715,7 +1717,7 @@ When you create a Vue component, **app.js is automatically created/updated** wit
 const server = new Server(
   {
     name: 'stellify-mcp',
-    version: '0.1.27',
+    version: '0.1.28',
   },
   {
     capabilities: {
