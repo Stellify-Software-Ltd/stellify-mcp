@@ -33,7 +33,7 @@ const STELLIFY_FRAMEWORK_API = {
   // Data & Forms
   Form: ['create', 'set', 'get', 'getData', 'validate', 'isValid', 'getErrors', 'getError', 'reset', 'store', 'update', 'delete'],
   Table: ['create', 'setData', 'addColumn', 'removeColumn', 'sort', 'filter', 'clearFilter', 'paginate', 'page', 'getData', 'getAllData', 'getColumns', 'getColumn', 'getTotalRows', 'getTotalPages', 'getCurrentPage', 'getPageSize', 'getSortKey', 'getSortDirection'],
-  List: ['create', 'from', 'range', 'add', 'remove', 'removeWhere', 'set', 'get', 'first', 'last', 'sort', 'sortBy', 'reverse', 'filter', 'find', 'findIndex', 'map', 'reduce', 'forEach', 'includes', 'indexOf', 'every', 'some', 'slice', 'take', 'skip', 'chunk', 'unique', 'uniqueBy', 'groupBy', 'flatten', 'concat', 'isEmpty', 'isNotEmpty', 'count', 'clear', 'toArray', 'toJSON', 'clone', 'sum', 'avg', 'min', 'max'],
+  Collection: ['create', 'collect', 'from', 'range', 'add', 'remove', 'removeWhere', 'set', 'get', 'first', 'last', 'sort', 'sortBy', 'reverse', 'filter', 'find', 'findIndex', 'map', 'reduce', 'forEach', 'includes', 'indexOf', 'every', 'some', 'slice', 'take', 'skip', 'chunk', 'unique', 'uniqueBy', 'groupBy', 'flatten', 'concat', 'isEmpty', 'isNotEmpty', 'count', 'clear', 'toArray', 'toJSON', 'clone', 'sum', 'avg', 'min', 'max'],
   Tree: ['create', 'setRoot', 'addChild', 'removeNode', 'getNode', 'getRoot', 'getChildren', 'getParent', 'getSiblings', 'getAncestors', 'getDescendants', 'getDepth', 'getPath', 'traverse', 'find', 'findAll', 'move', 'toArray', 'size'],
   // Network
   Http: ['create', 'get', 'post', 'put', 'patch', 'delete', 'items', 'withHeaders', 'withToken', 'withTimeout'],
@@ -85,11 +85,11 @@ Use this tool when you need to:
 
 IMPORTANT - Stellify Framework Import:
 The npm package is "stellify-framework" (NOT @stellify/core).
-Import like: import { Http, List, Form } from 'stellify-framework';
+Import like: import { Http, Collection, Form } from 'stellify-framework';
 
-IMPORTANT - List class and Vue reactivity:
-List is iterable and works directly with Vue's v-for directive.
-Use List.from() to wrap arrays for chainable operations (filter, map, sort, etc.).
+IMPORTANT - Collection class and Vue reactivity:
+Collection is iterable and works directly with Vue's v-for directive.
+Use Collection.collect() to wrap arrays for chainable operations (filter, map, sort, etc.).
 
 Example response:
 {
@@ -139,9 +139,11 @@ COMPLETE WORKFLOW:
 4. html_to_elements → create template elements (returns element UUIDs)
 5. save_file → FINALIZE by wiring template/data arrays with all collected UUIDs
 
-LEGACY (still supported but prefer combined tools above):
+TWO-STEP ALTERNATIVES (still supported but prefer combined tools above):
 - create_statement + add_statement_code (2 calls instead of 1)
-- create_method + add_method_body + save_method for is_async (3 calls instead of 1)
+- create_method (without body) + add_method_body (2 calls instead of 1)
+
+NOTE: add_method_body is also useful for APPENDING code to an existing method.
 
 For PHP: Use type='class', 'model', 'controller', or 'middleware'.
 For Vue: Use type='js' and extension='vue'. Place in the 'js' directory.
@@ -298,16 +300,17 @@ Example response includes:
   },
   {
     name: 'add_method_body',
-    description: `Parse and add PHP code to a method body. Provide the method implementation code (without the function declaration). Stellify will parse it into structured statements.
+    description: `Append code to an existing method. Use this when you need to ADD MORE code to a method that already has statements.
+
+**For new methods:** Use \`create_method\` with the \`body\` parameter instead - it creates the method with code in one call.
 
 **Nested code is handled correctly.** The parser tracks brace/bracket/paren depth and only splits on semicolons at the top level. Arrow functions with block bodies, computed properties, and other nested constructs work as single statements.
 
-IMPORTANT: This APPENDS to existing method statements. To REPLACE a method's code:
-1. Create a NEW method with create_method
-2. Add body with add_method_body
-3. Update the file's 'data' array to include new method UUID (remove old one)
-4. Update any element click handlers to reference the new method UUID
-5. Optionally delete the old method with delete_method`,
+IMPORTANT: This APPENDS to existing method statements. To REPLACE a method's code entirely:
+1. Create a NEW method with create_method (with body parameter)
+2. Update the file's 'data' array to include new method UUID (remove old one)
+3. Update any element click handlers to reference the new method UUID
+4. Delete the old method with delete_method`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1679,10 +1682,10 @@ notes.value = response.data || [];
 
 - **@click auto-wiring:** Pass the file UUID to html_to_elements to auto-wire @click handlers. Methods must be created BEFORE calling html_to_elements.
 - **Stellify imports:** Use "stellify-framework" package (NOT @stellify/core)
-  CORRECT: import { Http, List, Form } from 'stellify-framework';
+  CORRECT: import { Http, Collection, Form } from 'stellify-framework';
   WRONG: import { Http } from '@stellify/core';
 - v-model requires ref(), NOT Form class: const formData = ref({title: ''})
-- List is iterable and works directly with v-for (no .toArray() needed)
+- Collection is iterable and works directly with v-for (no .toArray() needed)
 - add_method_body APPENDS, doesn't replace - create new method to replace
 - 'data' array = method UUIDs, 'statements' array = import/variable UUIDs
 - For buttons in forms, set inputType: "button" to prevent auto-submit
