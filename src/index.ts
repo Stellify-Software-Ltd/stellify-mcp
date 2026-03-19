@@ -710,6 +710,11 @@ Create methods for all handlers, including simple state changes like opening mod
 
 Event types: click, submit, change, input, focus, blur, keydown, keyup, mouseenter, mouseleave.
 
+DYNAMIC CLASS BINDINGS - For classes that toggle based on expressions:
+{ "classBindings": { "rotate-180": "panel.open", "bg-red-500": "hasError" } }
+Assembles to: :class="{ 'rotate-180': panel.open, 'bg-red-500': hasError }"
+Use for state-dependent styling in v-for loops or reactive components.
+
 EFFICIENCY - Prefer updates over delete/recreate:
 - Move between routes: change \`routeParent\` attribute
 - Reparent elements: change \`parent\` attribute
@@ -723,7 +728,7 @@ EFFICIENCY - Prefer updates over delete/recreate:
         },
         data: {
           type: 'object',
-          description: 'Flat object with HTML attributes and Stellify fields (name, type, locked, tag, classes, text)',
+          description: 'Flat object with HTML attributes and Stellify fields (name, type, locked, tag, classes, text, classBindings)',
         },
       },
       required: ['uuid', 'data'],
@@ -1599,6 +1604,99 @@ This removes the "vote" setting profile entirely.`,
         },
       },
       required: ['name'],
+    },
+  },
+  {
+    name: 'get_pattern',
+    description: `Get a UI pattern checklist for building common components correctly.
+
+WHEN TO USE: Call this BEFORE building any of these UI patterns:
+- accordion: Collapsible content panels
+- modal: Overlay dialogs
+- tabs: Tabbed content navigation
+- dropdown: Toggleable menus
+- toast: Notification messages
+
+The checklist contains best practices and common pitfalls to avoid.
+Following the checklist prevents bugs like hidden content still being visible,
+missing keyboard navigation, or incorrect ARIA attributes.
+
+EXAMPLE:
+{ "name": "accordion" }
+
+Returns:
+{
+  "name": "accordion",
+  "description": "Collapsible content panels",
+  "checklist": [
+    "Use v-show for visibility toggle (not CSS height tricks)",
+    "Store open state as boolean in each panel object",
+    ...
+  ],
+  "example": "const panels = ref([...]);"
+}
+
+If no pattern exists for the given name, returns null.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Pattern name (e.g., "accordion", "modal", "tabs", "dropdown", "toast")',
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'save_pattern',
+    description: `Save or update a UI pattern checklist.
+
+Use this to add new patterns or update existing ones based on lessons learned.
+
+EXAMPLE:
+{
+  "name": "accordion",
+  "description": "Collapsible content panels",
+  "checklist": [
+    "Use v-show for visibility toggle",
+    "Store open state as boolean"
+  ],
+  "example": "const panels = ref([...]);"
+}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Pattern name (e.g., "accordion", "modal")',
+        },
+        description: {
+          type: 'string',
+          description: 'Brief description of the pattern',
+        },
+        checklist: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of checklist items - best practices and things to remember',
+        },
+        example: {
+          type: 'string',
+          description: 'Optional code example',
+        },
+      },
+      required: ['name', 'description', 'checklist'],
+    },
+  },
+  {
+    name: 'list_patterns',
+    description: `List all available UI pattern checklists.
+
+Returns an array of pattern names and descriptions.
+Use this to discover what patterns are available before building UI components.`,
+    inputSchema: {
+      type: 'object',
+      properties: {},
     },
   },
 ];
@@ -2587,6 +2685,57 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: JSON.stringify({
                 success: true,
                 message: `Deleted setting "${(args as any).name}"`,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_pattern': {
+        const result = await stellify.getPattern((args as any).name);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                pattern: result.data || result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'save_pattern': {
+        const { name, description, checklist, example } = args as {
+          name: string;
+          description: string;
+          checklist: string[];
+          example?: string;
+        };
+        await stellify.savePattern(name, { description, checklist, example });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Saved pattern "${name}" with ${checklist.length} checklist items`,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'list_patterns': {
+        const result = await stellify.listPatterns();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                patterns: result.data || result,
               }, null, 2),
             },
           ],

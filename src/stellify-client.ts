@@ -407,4 +407,24 @@ export class StellifyClient {
     return response.data;
   }
 
+  // UI Pattern checklists - best practices for common UI patterns
+  async getPattern(name: string) {
+    const response = await this.client.get(`/pattern/${name}`);
+    return response.data;
+  }
+
+  async savePattern(name: string, data: {
+    description: string;
+    checklist: string[];
+    example?: string;
+  }) {
+    const response = await this.client.put(`/pattern/${name}`, data);
+    return response.data;
+  }
+
+  async listPatterns() {
+    const response = await this.client.get('/pattern');
+    return response.data;
+  }
+
 }
