@@ -74,29 +74,7 @@ const STELLIFY_FRAMEWORK_API = {
 const tools: Tool[] = [
   {
     name: 'get_stellify_framework_api',
-    description: `Get the complete Stellify Framework API reference for Vue/JS development.
-
-Returns all modules and their methods for AI-friendly frontend code generation.
-
-Use this tool when you need to:
-- Look up available methods for a Stellify module
-- Verify method names before generating code
-- Understand the full API surface
-
-IMPORTANT - Stellify Framework Import:
-The npm package is "stellify-framework" (NOT @stellify/core).
-Import like: import { Http, Collection, Form } from 'stellify-framework';
-
-IMPORTANT - Collection class and Vue reactivity:
-Collection is iterable and works directly with Vue's v-for directive.
-Use Collection.collect() to wrap arrays for chainable operations (filter, map, sort, etc.).
-
-Example response:
-{
-  "Form": ["create", "set", "get", "validate", "store", "update", "delete", ...],
-  "Http": ["create", "get", "post", "put", "delete", "withToken", ...],
-  ...
-}`,
+    description: `Get Stellify Framework API reference. Import from "stellify-framework" (not @stellify/core). Collection is iterable with v-for.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -109,18 +87,7 @@ Example response:
   },
   {
     name: 'get_project',
-    description: `Get the active Stellify project for the authenticated user.
-
-IMPORTANT: Call this first before any other operations.
-
-Returns:
-- uuid: Project UUID (needed for most operations)
-- name: Project name
-- branch/branches: Git branch info
-- directories: Array of {uuid, name} for existing directories (js, controllers, models, etc.)
-
-Use the directories array to find existing directories before creating new ones.
-For example, look for a "js" directory before creating Vue components.`,
+    description: `Get active project. Returns uuid, name, branches, and directories array.`,
     inputSchema: {
       type: 'object',
       properties: {},
@@ -128,35 +95,12 @@ For example, look for a "js" directory before creating Vue components.`,
   },
   {
     name: 'create_file',
-    description: `Create a new file in a Stellify project.
+    description: `Create an empty file shell in a Stellify project. Returns file UUID.
 
-This creates an EMPTY file shell - no methods, statements, or template yet. The file exists but has no content.
+For PHP: type='class', 'model', 'controller', or 'middleware'.
+For Vue: type='js', extension='vue'. Auto-creates app.js and template route.
 
-COMPLETE WORKFLOW:
-1. create_file → creates empty shell, returns file UUID
-2. create_statement_with_code → add variables/imports in ONE call (returns statement UUIDs)
-3. create_method with body param → add functions in ONE call (returns method UUIDs)
-4. html_to_elements → create template elements (returns element UUIDs)
-5. save_file → FINALIZE by wiring template/data arrays with all collected UUIDs
-
-TWO-STEP ALTERNATIVES (still supported but prefer combined tools above):
-- create_statement + add_statement_code (2 calls instead of 1)
-- create_method (without body) + add_method_body (2 calls instead of 1)
-
-NOTE: add_method_body is also useful for APPENDING code to an existing method.
-
-For PHP: Use type='class', 'model', 'controller', or 'middleware'.
-For Vue: Use type='js' and extension='vue'. Place in the 'js' directory.
-  - Auto-creates app.js (check response.appJs)
-  - Auto-creates template route for visual editor (check response.templateRoute.uuid)
-
-DEPENDENCY RESOLUTION (automatic):
-Pass 'includes' as an array of namespace strings for FRAMEWORK classes (e.g., ["Illuminate\\Http\\Request", "Illuminate\\Support\\Facades\\Hash"]).
-The system resolves these to UUIDs automatically:
-- Illuminate\\*/Laravel\\* → fetches from Laravel API, creates in Application DB
-- Vendor packages → fetches from vendor, creates in Application DB
-
-NOTE: For controllers that use PROJECT models (Feedback, Vote, etc.), add those to the 'models' array in save_file instead. Do NOT put project models in includes - this causes duplicate use statement errors.`,
+Pass 'includes' array for framework class dependencies (auto-resolved to UUIDs). Use 'models' array in save_file for project models.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -196,42 +140,7 @@ NOTE: For controllers that use PROJECT models (Feedback, Vote, etc.), add those 
   },
   {
     name: 'create_method',
-    description: `Create a method in a file. Can optionally include the body and async flag in a single call.
-
-**NEW: Combined creation** - Pass 'body' to create the complete method in ONE call. Async is auto-detected when body contains \`await\`.
-
-**Nested code is handled correctly.** The parser tracks brace/bracket/paren depth and only splits statements on semicolons at the top level. This means computed properties, arrow functions with block bodies, and other nested constructs work correctly as single statements.
-
-Parameters are automatically created as clauses. The response includes the clause UUIDs for each parameter.
-
-Example request (simple - signature only):
-{
-  "file": "file-uuid",
-  "name": "verify",
-  "visibility": "public",
-  "returnType": "object",
-  "nullable": true,
-  "parameters": [
-    { "name": "credentials", "datatype": "array" }
-  ]
-}
-
-Example request (combined - with body, async auto-detected):
-{
-  "file": "file-uuid",
-  "name": "fetchData",
-  "body": "const response = await Http.get('/api/data');\\nreturn response.data;"
-}
-
-Example response includes:
-{
-  "uuid": "method-uuid",
-  "name": "fetchData",
-  "is_async": true,
-  "parameters": ["clause-uuid-for-credentials"],
-  "statements": {...},  // Only if body was provided
-  "clauses": {...}      // Only if body was provided
-}`,
+    description: `Create a method in a file. Pass 'body' to include implementation. Async auto-detected from \`await\`. For significant methods, include context fields.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -250,11 +159,11 @@ Example response includes:
         },
         is_static: {
           type: 'boolean',
-          description: 'Whether the method is static (PHP only)',
+          description: 'Static method (PHP only)',
         },
         is_async: {
           type: 'boolean',
-          description: 'Whether the method is async (JavaScript/Vue only). Set to true for methods that use await.',
+          description: 'Async method (JS/Vue). Auto-detected if body contains await.',
         },
         returnType: {
           type: 'string',
@@ -262,37 +171,43 @@ Example response includes:
         },
         nullable: {
           type: 'boolean',
-          description: 'Whether the return type is nullable (e.g., ?object)',
+          description: 'Nullable return type (e.g., ?object)',
         },
         parameters: {
           type: 'array',
-          description: 'Array of method parameters. Each parameter is created as a clause.',
+          description: 'Method parameters (created as clauses)',
           items: {
             type: 'object',
             properties: {
-              name: {
-                type: 'string',
-                description: 'Parameter name (e.g., "credentials", "id")',
-              },
-              datatype: {
-                type: 'string',
-                description: 'Parameter data type (e.g., "array", "int", "string", "Request")',
-              },
-              type: {
-                type: 'string',
-                description: 'Clause type, defaults to "variable"',
-              },
-              value: {
-                type: 'string',
-                description: 'Parameter value, defaults to the name',
-              },
+              name: { type: 'string', description: 'Parameter name' },
+              datatype: { type: 'string', description: 'Data type' },
+              type: { type: 'string', description: 'Clause type (default: variable)' },
+              value: { type: 'string', description: 'Default value' },
             },
             required: ['name'],
           },
         },
         body: {
           type: 'string',
-          description: 'Method body code (optional). If provided, automatically parses and adds the code. Example: "const response = await Http.get(\\"/api/data\\");\\nreturn response.data;"',
+          description: 'Method body code. Auto-parses statements.',
+        },
+        summary: {
+          type: 'string',
+          description: 'Context: What this method does',
+        },
+        rationale: {
+          type: 'string',
+          description: 'Context: Why built this way',
+        },
+        references: {
+          type: 'array',
+          description: 'Context: Related entities [{uuid, type, relationship, note}]',
+          items: { type: 'object' },
+        },
+        decisions: {
+          type: 'array',
+          description: 'Context: Design decisions',
+          items: { type: 'string' },
         },
       },
       required: ['file', 'name'],
@@ -332,32 +247,9 @@ IMPORTANT: This APPENDS to existing method statements. To REPLACE a method's cod
   },
   {
     name: 'save_method',
-    description: `Update an existing method's properties (name, visibility, returnType, nullable, parameters, data, is_async).
+    description: `Update a method's properties. Use add_method_body to append code.
 
-Use this to modify a method after creation. For updating the method body, use add_method_body instead.
-
-Parameters:
-- data: Array of statement UUIDs that form the method body. Use this to reorder statements or remove unwanted statements from the method.
-- is_async: Set to true for JavaScript/Vue methods that use await.
-
-Example - Update return type:
-{
-  "uuid": "method-uuid",
-  "returnType": "object",
-  "nullable": true
-}
-
-Example - Mark method as async (for methods using await):
-{
-  "uuid": "method-uuid",
-  "is_async": true
-}
-
-Example - Remove duplicate/unwanted statements:
-{
-  "uuid": "method-uuid",
-  "data": ["statement-uuid-1", "statement-uuid-2"]  // Only keep these statements
-}`,
+For significant changes, include context fields: summary, rationale, references, decisions.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -399,6 +291,32 @@ Example - Remove duplicate/unwanted statements:
         is_async: {
           type: 'boolean',
           description: 'Whether the method is async (JavaScript/Vue only). Set to true for methods that use await.',
+        },
+        summary: {
+          type: 'string',
+          description: 'Context: Brief description of what this method does',
+        },
+        rationale: {
+          type: 'string',
+          description: 'Context: Why it was built this way',
+        },
+        references: {
+          type: 'array',
+          description: 'Context: Links to related entities [{uuid, type, relationship, note}]',
+          items: {
+            type: 'object',
+            properties: {
+              uuid: { type: 'string' },
+              type: { type: 'string', enum: ['model', 'route', 'method', 'file', 'setting', 'element'] },
+              relationship: { type: 'string', enum: ['uses', 'creates', 'updates', 'calls', 'contains', 'triggers'] },
+              note: { type: 'string' },
+            },
+          },
+        },
+        decisions: {
+          type: 'array',
+          description: 'Context: Design decisions made',
+          items: { type: 'string' },
         },
       },
       required: ['uuid'],
@@ -542,27 +460,7 @@ Use this to look up a route you created or to find existing routes in the projec
   },
   {
     name: 'save_route',
-    description: `Update an existing route/page. Use this to wire a route to a controller method.
-
-IMPORTANT: This is how you connect API routes to controller methods!
-IMPORTANT: You MUST provide BOTH controller AND controller_method together - they are a pair.
-
-Example - Wire an API route to a controller method:
-{
-  "uuid": "route-uuid",
-  "controller": "controller-file-uuid",
-  "controller_method": "method-uuid"
-}
-
-Available fields:
-- controller: UUID of the controller file (MUST be paired with controller_method)
-- controller_method: UUID of the method to execute (MUST be paired with controller)
-- path: URL path
-- name: Route name
-- type: "web" or "api"
-- method: HTTP method (GET, POST, PUT, DELETE, PATCH)
-- middleware: Array of middleware names
-- public: Whether the route is public (no auth required)`,
+    description: `Update a route/page. Wire to controller with both controller and controller_method UUIDs. For significant routes, include context fields.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -572,11 +470,11 @@ Available fields:
         },
         controller: {
           type: 'string',
-          description: 'UUID of the controller file. MUST be provided together with controller_method.',
+          description: 'Controller file UUID. Requires controller_method.',
         },
         controller_method: {
           type: 'string',
-          description: 'UUID of the method to execute. MUST be provided together with controller.',
+          description: 'Method UUID. Requires controller.',
         },
         path: {
           type: 'string',
@@ -589,21 +487,36 @@ Available fields:
         type: {
           type: 'string',
           enum: ['web', 'api'],
-          description: 'Route type',
         },
         method: {
           type: 'string',
           enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-          description: 'HTTP method',
         },
         middleware: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of middleware names',
         },
         public: {
           type: 'boolean',
-          description: 'Whether the route is public (no auth required)',
+          description: 'Public route (no auth)',
+        },
+        summary: {
+          type: 'string',
+          description: 'Context: What this endpoint does',
+        },
+        rationale: {
+          type: 'string',
+          description: 'Context: Why built this way',
+        },
+        references: {
+          type: 'array',
+          description: 'Context: Related entities [{uuid, type, relationship, note}]',
+          items: { type: 'object' },
+        },
+        decisions: {
+          type: 'array',
+          description: 'Context: Design decisions',
+          items: { type: 'string' },
         },
       },
       required: ['uuid'],
@@ -652,23 +565,7 @@ Use the returned UUID with html_to_elements (page parameter) or get_route for fu
   },
   {
     name: 'create_element',
-    description: `Create a new UI element on a page (for Elements v2). Provide either page (route UUID) for root elements, or parent (element UUID) for child elements.
-
-Valid element types:
-- HTML5: s-wrapper, s-input, s-form, s-svg, s-shape, s-media, s-iframe
-- Components: s-loop, s-transition, s-freestyle, s-motion
-- Blade: s-directive
-- Shadcn/ui: s-chart, s-table, s-combobox, s-accordion, s-calendar, s-contiguous
-
-s-loop ELEMENT TYPE:
-Use s-loop for elements that should render with v-for directive.
-Required attributes (set via update_element after creation):
-- loop: The v-for expression (e.g., "note in notes", "item in items")
-- key: The :key binding (e.g., "note.id", "item.id")
-
-Example: After creating s-loop, update it with:
-{ "tag": "div", "loop": "note in notes", "key": "note.id", "classes": ["card", "p-4"] }
-Generates: <div class="card p-4" v-for="note in notes" :key="note.id">`,
+    description: `Create a UI element. Provide page (route UUID) for root elements, or parent (element UUID) for children. Use s-loop for v-for elements.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -696,29 +593,7 @@ Generates: <div class="card p-4" v-for="note in notes" :key="note.id">`,
   },
   {
     name: 'update_element',
-    description: `Update a UI element's attributes.
-
-Pass data object with: tag, classes (array), text, variable (for v-model), and event handlers.
-
-Key fields: inputType (not 'type') for button/input HTML type. clickArgs for handler arguments in v-for loops.
-
-EVENT HANDLERS - Use method UUIDs:
-{ "click": "method-uuid" } → @click="methodName"
-{ "click": "method-uuid", "clickArgs": "item" } → @click="methodName(item)"
-
-Create methods for all handlers, including simple state changes like opening modals or toggling flags.
-
-Event types: click, submit, change, input, focus, blur, keydown, keyup, mouseenter, mouseleave.
-
-DYNAMIC CLASS BINDINGS - For classes that toggle based on expressions:
-{ "classBindings": { "rotate-180": "panel.open", "bg-red-500": "hasError" } }
-Assembles to: :class="{ 'rotate-180': panel.open, 'bg-red-500': hasError }"
-Use for state-dependent styling in v-for loops or reactive components.
-
-EFFICIENCY - Prefer updates over delete/recreate:
-- Move between routes: change \`routeParent\` attribute
-- Reparent elements: change \`parent\` attribute
-- Reorder children: update parent's \`data\` array with new UUID order`,
+    description: `Update a UI element. Data object: tag, classes, text, event handlers (method UUIDs), classBindings. Include context for significant UI components.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -728,7 +603,7 @@ EFFICIENCY - Prefer updates over delete/recreate:
         },
         data: {
           type: 'object',
-          description: 'Flat object with HTML attributes and Stellify fields (name, type, locked, tag, classes, text, classBindings)',
+          description: 'HTML attributes and Stellify fields (tag, classes, text, classBindings, click, submit). Context fields: summary, rationale, references, decisions.',
         },
       },
       required: ['uuid', 'data'],
@@ -860,19 +735,7 @@ Prefer SVG icons over emoji (encoding issues).`,
   },
   {
     name: 'create_statement',
-    description: `Create an empty statement in a file. This is step 1 of 2 - you MUST call add_statement_code next to add the actual code.
-
-**ALTERNATIVE:** Use create_statement_with_code for a single-call approach that combines both steps.
-
-IMPORTANT: This is a TWO-STEP process:
-1. create_statement → returns statement UUID
-2. add_statement_code → adds the actual code to that statement
-
-Use cases:
-- PHP: Class properties, use statements, constants
-- JS/Vue: Variable declarations, imports, reactive refs
-
-For Vue components, include the returned statement UUID in save_file's 'statements' array (NOT 'data' - that's for methods).`,
+    description: `Create empty statement (step 1 of 2). Call add_statement_code next. Prefer create_statement_with_code for single call.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -889,17 +752,7 @@ For Vue components, include the returned statement UUID in save_file's 'statemen
   },
   {
     name: 'create_statement_with_code',
-    description: `Create a statement with code in a SINGLE call. This combines create_statement and add_statement_code.
-
-**PREFERRED:** Use this instead of the two-step create_statement → add_statement_code process.
-
-**Nested code is handled correctly.** The parser tracks brace/bracket/paren depth and only splits on top-level semicolons. Computed properties, arrow functions with block bodies, and other nested constructs are kept as single statements.
-
-Examples:
-- PHP: "use Illuminate\\Http\\Request;" or "private $items = [];"
-- JS/Vue: "const count = ref(0);" or "import { ref } from 'vue';"
-
-For Vue components, include the returned statement UUIDs in save_file's 'statements' array (NOT 'data' - that's for methods).`,
+    description: `Create a statement with code in one call. Preferred over two-step create_statement + add_statement_code.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -991,38 +844,9 @@ Examples:
   },
   {
     name: 'save_file',
-    description: `Save/update a file with its full configuration. This FINALIZES the file after create_file.
+    description: `Finalize a file. Full replacement - call get_file first to update existing files.
 
-WORKFLOW: create_file creates an empty shell → add methods/statements → save_file wires everything together.
-
-IMPORTANT: This is a full replacement, not a partial update. To update an existing file:
-1. Call get_file to fetch current state
-2. Modify the returned object
-3. Call save_file with the complete object
-
-Required fields: uuid, name, type
-
-IMPORTANT - data vs statements:
-- 'data' array = METHOD UUIDs only (functions)
-- 'statements' array = STATEMENT UUIDs (imports, variables, refs - code outside methods)
-
-Vue SFC example:
-  save_file({
-    uuid: fileUuid,
-    name: "Counter",
-    type: "js",
-    extension: "vue",
-    template: [rootElementUuid],      // From html_to_elements
-    data: [methodUuid],               // Method UUIDs only
-    statements: [importStmtUuid, refStmtUuid]  // Statement UUIDs (imports, refs)
-  })
-
-For <script setup> content, the order in statements array determines output order.
-
-DEPENDENCY RESOLUTION (includes array):
-The 'includes' array accepts BOTH UUIDs and namespace strings.
-Namespace strings (e.g., "Illuminate\\Http\\JsonResponse") are automatically resolved to UUIDs.
-This works the same as create_file's dependency resolution.`,
+Required: uuid, name, type. For significant changes, include context fields: summary, rationale, references, decisions.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1046,27 +870,45 @@ This works the same as create_file's dependency resolution.`,
         template: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of root element UUIDs for Vue <template> section (from html_to_elements)',
+          description: 'Root element UUIDs for Vue <template>',
         },
         data: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of METHOD UUIDs only (functions created via create_method)',
+          description: 'Method UUIDs (from create_method)',
         },
         statements: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of STATEMENT UUIDs (imports, variables, refs - created via create_statement)',
+          description: 'Statement UUIDs (imports, variables, refs)',
         },
         includes: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of file UUIDs OR namespace strings for FRAMEWORK classes only (Request, JsonResponse, etc.). Do NOT put project models here - use the models array instead.',
+          description: 'Framework class UUIDs or namespaces. Use models array for project models.',
         },
         models: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of model file UUIDs for PROJECT models (Feedback, Vote, etc.). These get sandbox namespace automatically. Do NOT also add these to includes or you will get duplicate use statement errors.',
+          description: 'Project model UUIDs (auto-namespaced). Do NOT duplicate in includes.',
+        },
+        summary: {
+          type: 'string',
+          description: 'Context: What this file does and why it exists',
+        },
+        rationale: {
+          type: 'string',
+          description: 'Context: Why it was built this way',
+        },
+        references: {
+          type: 'array',
+          description: 'Context: Related entities [{uuid, type, relationship, note}]',
+          items: { type: 'object' },
+        },
+        decisions: {
+          type: 'array',
+          description: 'Context: Design decisions',
+          items: { type: 'string' },
         },
       },
       required: ['uuid', 'name', 'type'],
@@ -1203,15 +1045,7 @@ Changes are EPHEMERAL (not saved). For persistent changes, use update_element or
   },
   {
     name: 'create_resources',
-    description: `Scaffold Model, Controller, Service, and Migration in ONE operation.
-
-Creates: Model ($fillable, $casts, relationships), Controller (CRUD actions), Service (optional), Migration.
-
-IMPORTANT: Routes are NOT auto-wired. After creation, use create_route with the returned controller UUID and method UUIDs.
-
-IMPORTANT: After creation, check the controller methods for return types and parameter types. If methods use classes not already in includes (e.g., JsonResponse), add those class UUIDs to the controller's includes via save_file.
-
-Response includes controller.methods array with {uuid, name} for each action (index, store, update, destroy).`,
+    description: `Scaffold Model, Controller, Service, and Migration. Routes are NOT auto-wired - use create_route after.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1310,40 +1144,7 @@ Response includes controller.methods array with {uuid, name} for each action (in
   },
   {
     name: 'run_code',
-    description: `Execute a method in the Stellify project environment and return the output.
-
-This tool allows you to run methods you've created and see the results. Use this for:
-- Testing methods you've created
-- Verifying code behavior
-- Debugging issues
-- Getting real feedback on code execution
-
-REQUIRED: Both file and method UUIDs must be provided.
-
-EXAMPLES:
-
-Run a method:
-{
-  "file": "file-uuid",
-  "method": "method-uuid",
-  "args": []
-}
-
-Run with benchmarking enabled:
-{
-  "file": "file-uuid",
-  "method": "method-uuid",
-  "benchmark": true
-}
-
-RESPONSE includes:
-- output: The return value or printed output
-- success: Whether execution succeeded
-- error: Error message if failed
-- execution_time: Time taken (if benchmark enabled)
-- memory_usage: Memory used (if benchmark enabled)
-
-SECURITY: Code runs in a sandboxed environment with limited permissions.`,
+    description: `Execute a method in sandboxed environment. Requires file and method UUIDs. Returns output, success, error, and optional benchmark data.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1374,18 +1175,7 @@ SECURITY: Code runs in a sandboxed environment with limited permissions.`,
   },
   {
     name: 'request_capability',
-    description: `Log a missing system-level capability request.
-
-Use this when you encounter a user requirement that needs framework-level functionality
-that doesn't exist in Stellify. This creates a ticket in the Stellify backlog.
-
-DO NOT try to build system capabilities yourself - log them here instead.
-
-Examples of capability requests:
-- "Need WebSocket support for real-time chat"
-- "Need S3 file upload with signed URLs"
-- "Need scheduled task runner for daily reports"
-- "Need OAuth2 social login (Google, GitHub)"`,
+    description: `Log a missing framework-level capability. Creates a ticket in the Stellify backlog.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1416,33 +1206,7 @@ Examples of capability requests:
   },
   {
     name: 'analyze_performance',
-    description: `Analyze code execution performance from logs. Identifies slow methods, N+1 query patterns, high memory usage, and failure rates.
-
-Use this tool PROACTIVELY to:
-- Review performance after creating new methods
-- Identify optimization opportunities
-- Detect N+1 query patterns (high query counts)
-- Find methods that need caching or refactoring
-- Check failure rates and error patterns
-
-ANALYSIS TYPES:
-- full: Comprehensive report with all issues, recommendations, and statistics
-- slow_methods: Methods exceeding 500ms execution time
-- high_query_methods: Methods with >10 queries (potential N+1 problems)
-- high_memory_methods: Methods using >50MB memory
-- failure_rates: Methods with high error rates
-- trend: Performance trend over time (daily averages)
-
-EXAMPLE - Full analysis:
-{ "type": "full", "days": 7 }
-
-EXAMPLE - Check for N+1 queries:
-{ "type": "high_query_methods", "limit": 10 }
-
-The response includes actionable recommendations like:
-- "Consider eager loading relationships" for N+1 patterns
-- "Add database indexes" for slow queries
-- "Use chunking" for high memory usage`,
+    description: `Analyze execution performance from logs. Types: full, slow_methods, high_query_methods, high_memory_methods, failure_rates, trend.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1464,32 +1228,7 @@ The response includes actionable recommendations like:
   },
   {
     name: 'analyze_quality',
-    description: `Analyze Laravel code structure for quality issues. Detects missing relationships, fillables, casts, and route problems.
-
-Use this tool PROACTIVELY to:
-- Review code quality after creating models or controllers
-- Detect missing Eloquent relationships (belongsTo, hasMany)
-- Find migration fields not in $fillable
-- Suggest type casts for columns (json → array, datetime → datetime)
-- Identify broken route bindings (orphaned methods, missing controllers)
-
-ANALYSIS TYPES:
-- full: Comprehensive analysis of all categories with recommendations
-- relationships: Missing belongsTo/hasMany based on foreign keys
-- fillables: Migration fields not in Model $fillable array
-- casts: Columns that should have type casts
-- routes: Orphaned controller methods, routes pointing to missing methods
-
-EXAMPLE - Full analysis:
-{ "type": "full" }
-
-EXAMPLE - Check relationships only:
-{ "type": "relationships" }
-
-The response includes actionable suggestions like:
-- "Add belongsTo relationship: public function user() { return $this->belongsTo(User::class); }"
-- "Add 'published_at' to $fillable array"
-- "Add cast: 'metadata' => 'array'"`,
+    description: `Analyze Laravel code for quality issues. Types: full, relationships, fillables, casts, routes. Returns actionable suggestions.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1503,27 +1242,7 @@ The response includes actionable suggestions like:
   },
   {
     name: 'get_setting',
-    description: `Get a setting/config value from the tenant's settings table.
-
-These settings are read by the config() function in sandbox code execution.
-Use this to check existing configuration values before modifying them.
-
-EXAMPLE:
-{ "name": "app" }
-
-Returns the setting data as key-value pairs, e.g.:
-{
-  "name": "My App",
-  "timezone": "UTC",
-  "locale": "en"
-}
-
-Common setting profiles:
-- "app": Application settings (name, timezone, locale)
-- "database": Database connection settings
-- "mail": Mail configuration
-- "cache": Cache settings
-- Custom profiles for app-specific config`,
+    description: `Get a setting profile by name. Returns key-value pairs accessible via config() in code.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1537,38 +1256,7 @@ Common setting profiles:
   },
   {
     name: 'save_setting',
-    description: `Create or update a setting in the tenant's settings table.
-
-These settings are accessible via config() in sandbox code execution.
-Use this to configure application behavior, API keys, feature flags, etc.
-
-IMPORTANT: This creates or updates the setting profile with the provided key-value data.
-The data is merged with any existing values for that profile.
-
-EXAMPLE - Create app settings:
-{
-  "name": "app",
-  "data": {
-    "name": "My Feedback App",
-    "timezone": "America/New_York",
-    "locale": "en"
-  }
-}
-
-EXAMPLE - Create custom settings for voting:
-{
-  "name": "vote",
-  "data": {
-    "salt": "my-secret-salt-for-ip-hashing",
-    "allow_anonymous": true,
-    "max_votes_per_day": 10
-  }
-}
-
-In your controller code, access these with:
-- config('app.name') returns "My Feedback App"
-- config('vote.salt') returns "my-secret-salt-for-ip-hashing"
-- config('vote.allow_anonymous') returns true`,
+    description: `Create or update a setting profile. Data is merged with existing values. Access via config('name.key') in code.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1608,35 +1296,7 @@ This removes the "vote" setting profile entirely.`,
   },
   {
     name: 'get_pattern',
-    description: `Get a UI pattern checklist for building common components correctly.
-
-WHEN TO USE: Call this BEFORE building any of these UI patterns:
-- accordion: Collapsible content panels
-- modal: Overlay dialogs
-- tabs: Tabbed content navigation
-- dropdown: Toggleable menus
-- toast: Notification messages
-
-The checklist contains best practices and common pitfalls to avoid.
-Following the checklist prevents bugs like hidden content still being visible,
-missing keyboard navigation, or incorrect ARIA attributes.
-
-EXAMPLE:
-{ "name": "accordion" }
-
-Returns:
-{
-  "name": "accordion",
-  "description": "Collapsible content panels",
-  "checklist": [
-    "Use v-show for visibility toggle (not CSS height tricks)",
-    "Store open state as boolean in each panel object",
-    ...
-  ],
-  "example": "const panels = ref([...]);"
-}
-
-If no pattern exists for the given name, returns null.`,
+    description: `Get a UI pattern checklist (accordion, modal, tabs, dropdown, toast). Returns best practices and common pitfalls.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1812,13 +1472,31 @@ Vue evaluates v-model bindings before v-else is applied, causing "Cannot read pr
 When you create a Vue component, **app.js is automatically created/updated** with component registration. The create_file response will confirm this with an \`appJs\` field.
 
 **Page mount point:** Each page using Vue needs \`<div id="app"></div>\`:
-- html_to_elements(page=routeUuid, elements='<div id="app"></div>')`;
+- html_to_elements(page=routeUuid, elements='<div id="app"></div>')
+
+## Context Documentation
+
+Add context fields to significant changes (methods, files, routes, elements) to help future AI sessions understand the application.
+
+**When to add context:** New features, significant changes, multi-entity implementations.
+**Skip context for:** Trivial changes, temporary code, unchanged context.
+
+**Context fields** (flat in data object, used with save_method, save_file, save_route, update_element):
+- \`summary\`: What this does
+- \`rationale\`: Why it was built this way
+- \`references\`: [{uuid, type, relationship, note}] - links to related entities
+- \`decisions\`: Array of design decisions
+
+Reference types: model, route, method, file, setting, element
+Relationships: uses, creates, updates, calls, contains, triggers
+
+Context is preserved across updates - the backend merges fields.`;
 
 // Create MCP server
 const server = new Server(
   {
     name: 'stellify-mcp',
-    version: '0.1.29',
+    version: '0.1.30',
   },
   {
     capabilities: {
@@ -2746,15 +2424,41 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         throw new Error(`Unknown tool: ${name}`);
     }
   } catch (error: any) {
+    // Extract backend response data for better error messages
+    const backendData = error.response?.data;
+    const statusCode = error.response?.status;
+
+    // Build a helpful error response
+    const errorResponse: Record<string, any> = {
+      success: false,
+      error: backendData?.message || error.message || 'Request failed',
+    };
+
+    // Include hint if the backend provided one
+    if (backendData?.hint) {
+      errorResponse.hint = backendData.hint;
+    }
+
+    // Include validation errors if present
+    if (backendData?.errors) {
+      errorResponse.validation_errors = backendData.errors;
+    }
+
+    // Include status code for context
+    if (statusCode) {
+      errorResponse.status = statusCode;
+    }
+
+    // Include the original message if different from backend message
+    if (backendData?.message && error.message && !error.message.includes(backendData.message)) {
+      errorResponse.details = { message: backendData.message };
+    }
+
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
-            success: false,
-            error: error.message,
-            details: error.response?.data || error.toString(),
-          }, null, 2),
+          text: JSON.stringify(errorResponse, null, 2),
         },
       ],
       isError: true,
