@@ -100,7 +100,11 @@ const tools: Tool[] = [
 For PHP: type='class', 'model', 'controller', or 'middleware'.
 For Vue: type='js', extension='vue'. Auto-creates app.js and template route.
 
-Pass 'includes' array for framework class dependencies (auto-resolved to UUIDs). Use 'models' array in save_file for project models.`,
+Pass 'includes' array for framework class dependencies (auto-resolved to UUIDs). Use 'models' array in save_file for project models.
+
+**IMPORTANT - Check appJs response for Vue components:**
+- If \`appJs.action_required === "create_or_select_mount_file"\`: No mount file exists. You MUST ask the user if they want to create a new app.js mount file before proceeding.
+- If \`appJs.action_required === "register_component"\`: Mount file exists but component isn't registered. Call save_file on the mount file to add the component UUID to its includes array.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -526,7 +530,7 @@ Use this to look up a route you created or to find existing routes in the projec
     name: 'delete_route',
     description: `Delete a route/page from the project by UUID. This permanently removes the route.
 
-WARNING: This is destructive and cannot be undone. Any elements attached to this route will become orphaned.`,
+WARNING: This is destructive and cannot be undone. Any elements attached to this route will be deleted also.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -574,8 +578,7 @@ Use the returned UUID with html_to_elements (page parameter) or get_route for fu
           enum: [
             's-wrapper', 's-input', 's-form', 's-svg', 's-shape', 's-media', 's-iframe',
             's-loop', 's-transition', 's-freestyle', 's-motion',
-            's-directive',
-            's-chart', 's-table', 's-combobox', 's-accordion', 's-calendar', 's-contiguous'
+            's-directive'
           ],
           description: 'Element type - must be one of the valid Stellify element types',
         },
@@ -885,7 +888,7 @@ Required: uuid, name, type. For significant changes, include context fields: sum
         includes: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Framework class UUIDs or namespaces. Use models array for project models.',
+          description: 'File UUIDs for local imports (e.g., Vue components imported by app.js) AND framework class UUIDs/namespaces. CRITICAL: For JS mount files, add imported Vue component UUIDs here or they won\'t be bundled. Use models array for project models.',
         },
         models: {
           type: 'array',
@@ -1359,144 +1362,63 @@ Use this to discover what patterns are available before building UI components.`
       properties: {},
     },
   },
+  {
+    name: 'get_assembled_code',
+    description: `Get the assembled source code for a file. Returns the actual Vue SFC or PHP class as it would be rendered.
+
+Use this after save_file to verify the component was built correctly:
+- Check that all methods are included
+- Verify @click handlers are wired to methods
+- Confirm imports and reactive state are present
+- Spot any missing pieces before deployment`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the file to get assembled code for',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
 ];
 
 // Server instructions for tool discovery (used by MCP Tool Search)
-const SERVER_INSTRUCTIONS = `Stellify is a coding platform where you code alongside AI on a codebase maintained and curated by AI. Build Laravel, stellify-framework, and Vue.js applications.
+const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored as structured JSON in a database, enabling surgical AI edits. Build Laravel (PHP) applications with StellifyJS (a front-end Laravel extension framework that has adaptors for reactive frameworks such as Vue, React and library wrappers for chart.js etc.).
 
-Use Stellify tools when:
-- Building PHP controllers, models, middleware, or classes
-- Creating Vue.js components with reactive state and UI
-- Managing UI elements (HTML stored as structured JSON)
-- Working with a Stellify project (user will mention "Stellify" or provide project UUID)
+## Architecture
 
-Key concepts:
-- Code is stored as structured JSON, enabling surgical AI edits at the statement level
-- Files contain methods and statements (code outside methods)
-- Vue components link to UI elements via the 'template' field
-- Event handlers (click, submit) wire UI elements to methods by UUID
+- Files are stored as json. The json has a data key that references its methods (using uuids), and each method has a data key that references statements, and each statement has a data key that references clauses.
 
-## General Workflow (all file types)
+## Example Workflow
+1. Research: Call the get_project tool to understand the current project structure, existing files, and directories. This helps avoid duplicates and informs where to create new files.
+2. Plan: If the user is in plan mode, create a plan and prompt the user to accept before starting.
+3. Execute: Map out the solution in full before calling any tools. Use the tools to verify assumptions and gather information about the project as needed.
+4. Create: create_file, create_method (with body), create_statement_with_code
+5. Wire: html_to_elements (pass file UUID to auto-wire @click handlers)
+6. Finalize: save_file with template/data/statements arrays
+7. Verify: Call \`get_assembled_code\` to see the actual rendered output and fix any issues
+8. Test: Use run_code to execute methods and verify behavior. For UI components, use broadcast_element_command to demonstrate functionality in real-time.
 
-1. create_file → empty shell, returns file UUID
-2. create_method → signature only, returns method UUID
-3. add_method_body → implementation code
-4. create_statement + add_statement_code → for imports, variables, refs
-5. save_file → finalize with template/data/statements arrays
+## Component Response Handling (IMPORTANT)
 
-## Vue Component Workflow
+When creating Vue/ React etc. components, ALWAYS check the \`appJs\` field in the response:
 
-1. get_project → find 'js' directory UUID (or create it)
-2. create_file → type='js', extension='vue' for the component
-   - **Auto-creates app.js** and **template route** (check response for appJs and templateRoute fields)
-3. Create statements for imports using **create_statement_with_code** (ONE call each):
-   - create_statement_with_code(file, "import { ref, onMounted } from 'vue';")
-   - create_statement_with_code(file, "import { Http } from 'stellify-framework';")
-4. Create statements for reactive data: create_statement_with_code(file, "const notes = ref([]);")
-5. **create_method with body** (async auto-detected from \`await\`). Example:
-   \`\`\`
-   create_method({
-     file: fileUuid,
-     name: "fetchNotes",
-     body: "const response = await Http.get('/api/notes');\\nnotes.value = response.data || [];"
-   })
-   \`\`\`
-6. Create statement for onMounted: create_statement_with_code(file, "onMounted(fetchData);")
-7. **Create UI interaction methods** for any button that changes state:
-   \`\`\`
-   create_method({ file: fileUuid, name: "openModal", body: "showModal.value = true;" })
-   create_method({ file: fileUuid, name: "closeModal", body: "showModal.value = false;" })
-   \`\`\`
-8. html_to_elements with @click handlers auto-wired:
-   \`\`\`
-   html_to_elements({
-     elements: '<button @click="openModal">Open</button>',
-     page: templateRoute.uuid,
-     file: fileUuid  // Auto-wires @click="openModal" to the method UUID
-   })
-   \`\`\`
-9. save_file with: extension='vue', template=[elementUuid], data=[methodUuids], statements=[importUuids, refUuids, onMountedUuid]
-11. Create web route for the display page (e.g., "/notes")
-12. Add \`<div id="app"></div>\` to the display page: html_to_elements(page=routeUuid, elements='<div id="app"></div>')
+1. **appJs.action_required === "create_or_select_mount_file"**: No mount file exists. You MUST immediately ask the user: "Would you like me to create an app.js mount file for this component?" Do NOT proceed without user confirmation.
 
-## Fetching Paginated Data
+2. **appJs.action_required === "register_component"**: Mount file exists but component isn't registered. Call save_file on the mount file (appJs.uuid) to add the component UUID to its includes array.
 
-Use \`Http.items()\` for paginated endpoints - it auto-extracts the array from Laravel responses:
+3. **No action_required**: Component is already registered in a mount file. Proceed normally.
+`;
 
-\`\`\`javascript
-// Recommended - auto-extracts .data from paginated response
-notes.value = await Http.items('/api/notes');
-
-// Alternative - manual extraction
-const response = await Http.get('/api/notes');
-notes.value = response.data || [];
-\`\`\`
-
-## Editing Existing Code
-
-- **Edit at the right level:** To change code, edit the statement or clause - never delete an entire method just to change a line.
-
-## Common Pitfalls
-
-- **@click auto-wiring:** Pass the file UUID to html_to_elements to auto-wire @click handlers. Methods must be created BEFORE calling html_to_elements.
-- **Stellify imports:** Use "stellify-framework" package (NOT @stellify/core)
-  CORRECT: import { Http, Collection, Form } from 'stellify-framework';
-  WRONG: import { Http } from '@stellify/core';
-- v-model requires ref(), NOT Form class: const formData = ref({title: ''})
-- Collection is iterable and works directly with v-for (no .toArray() needed)
-- add_method_body APPENDS, doesn't replace - create new method to replace
-- 'data' array = method UUIDs, 'statements' array = import/variable UUIDs
-- For buttons in forms, set inputType: "button" to prevent auto-submit
-- **Async methods:** Auto-detected when body contains \`await\`. Response includes \`is_async: true\` if detected.
-- **onMounted:** Use direct method reference: "onMounted(fetchNotes);"
-  The assembler automatically outputs lifecycle hooks after method definitions.
-
-## Nullable Refs: Use explicit v-if, NOT v-else
-
-When using nullable refs (e.g., \`const editingItem = ref(null)\`) with v-model, use explicit v-if guards:
-- WRONG: \`<template v-else><input v-model="editingItem.title"/></template>\`
-- CORRECT: \`<template v-if="editingItem && editingItem.id === item.id"><input v-model="editingItem.title"/></template>\`
-
-Vue evaluates v-model bindings before v-else is applied, causing "Cannot read properties of null" errors.
-
-## Stack and Business Logic
-
-**Default stack:** Laravel (PHP), stellify-framework (JS), and Vue.js. Available capabilities (optional packages/libraries) are returned by \`get_project\`. Use \`get_stellify_framework_api\` for the stellify-framework API reference.
-
-**All business logic** (controllers, models, middleware, etc.) goes in the tenant DB via MCP tools. If a required capability is not available, use \`request_capability\` to log it.
-
-**Prefer Laravel methods:** When Laravel provides a helper (Str, Arr, Hash, Number, Collection), use it instead of native PHP functions.
-
-## JavaScript Entry File (app.js) - Auto-Generated
-
-When you create a Vue component, **app.js is automatically created/updated** with component registration. The create_file response will confirm this with an \`appJs\` field.
-
-**Page mount point:** Each page using Vue needs \`<div id="app"></div>\`:
-- html_to_elements(page=routeUuid, elements='<div id="app"></div>')
-
-## Context Documentation
-
-Add context fields to significant changes (methods, files, routes, elements) to help future AI sessions understand the application.
-
-**When to add context:** New features, significant changes, multi-entity implementations.
-**Skip context for:** Trivial changes, temporary code, unchanged context.
-
-**Context fields** (flat in data object, used with save_method, save_file, save_route, update_element):
-- \`summary\`: What this does
-- \`rationale\`: Why it was built this way
-- \`references\`: [{uuid, type, relationship, note}] - links to related entities
-- \`decisions\`: Array of design decisions
-
-Reference types: model, route, method, file, setting, element
-Relationships: uses, creates, updates, calls, contains, triggers
-
-Context is preserved across updates - the backend merges fields.`;
+// Legacy detailed instructions preserved as comments for reference if needed
 
 // Create MCP server
 const server = new Server(
   {
     name: 'stellify-mcp',
-    version: '0.1.30',
+    version: '0.1.31',
   },
   {
     capabilities: {
@@ -2415,6 +2337,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 success: true,
                 patterns: result.data || result,
               }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_assembled_code': {
+        const result = await stellify.getAssembledCode(args.uuid as string);
+        // Return just the code content for easy reading
+        const code = result.files?.[0]?.content || result.data?.code || 'No code available';
+        const fileName = result.files?.[0]?.path || result.entryPoint || 'unknown';
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `// ${fileName}\n\n${code}`,
             },
           ],
         };

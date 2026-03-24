@@ -427,4 +427,10 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Code Assembly - get rendered source code for a file
+  async getAssembledCode(uuid: string) {
+    const response = await this.client.get(`/file/${uuid}/source`);
+    return response.data;
+  }
+
 }
