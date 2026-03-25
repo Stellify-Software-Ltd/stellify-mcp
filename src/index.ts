@@ -65,10 +65,14 @@ const STELLIFY_FRAMEWORK_API = {
   Diff: ['chars', 'words', 'lines', 'apply', 'createPatch', 'distance', 'similarity', 'commonPrefix', 'commonSuffix'],
   // Utilities
   Time: ['now', 'create', 'parse', 'format', 'toISO', 'toDate', 'toTimestamp', 'toUnix', 'add', 'subtract', 'diff', 'isBefore', 'isAfter', 'isSame', 'isBetween', 'startOf', 'endOf', 'year', 'month', 'day', 'weekday', 'hour', 'minute', 'second', 'relative', 'clone'],
-  // Adapters
+  // Vue Composables
   useStellify: ['(generic adapter for any module)'],
-  useForm: ['bind'],
-  useTable: ['(reactive table adapter)'],
+  useForm: ['bind', 'state', 'set', 'get', 'getData', 'validate', 'isValid', 'getErrors', 'getError', 'reset', 'store', 'update', 'delete'],
+  useTable: ['state', 'setData', 'addColumn', 'removeColumn', 'sort', 'filter', 'clearFilter', 'paginate', 'page'],
+  useInfiniteScroll: ['items (Collection)', 'loading', 'hasMore', 'error', 'page', 'total', 'loadMore', 'reset', 'refresh', 'sentinelRef'],
+  useLiveData: ['data (Collection)', 'loading', 'error', 'connected', 'refresh', 'disconnect', 'reconnect', 'push', 'remove', 'update'],
+  useQueryState: ['(reactive refs per param)', 'getAll', 'setAll', 'reset', 'getUrl'],
+  useLazyLoad: ['data', 'visible', 'loading', 'loaded', 'error', 'targetRef', 'load', 'reset'],
 };
 
 const tools: Tool[] = [
@@ -1440,7 +1444,7 @@ When creating Vue/ React etc. components, ALWAYS check the \`appJs\` field in th
 const server = new Server(
   {
     name: 'stellify-mcp',
-    version: '0.1.32',
+    version: '0.1.33',
   },
   {
     capabilities: {
