@@ -1417,25 +1417,16 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 
 - Files are stored as json. The json has a data key that references its methods (using uuids), and each method has a data key that references statements, and each statement has a data key that references clauses.
 
-## Example Workflow
-1. Research: Call the get_project tool to understand the current project structure, existing files, and directories. This helps avoid duplicates and informs where to create new files.
-2. Plan: If the user is in plan mode, create a plan and prompt the user to accept before starting.
-3. Execute: Map out the solution in full before calling any tools. Use the tools to verify assumptions and gather information about the project as needed.
+## Workflow (follow every step)
+1. Research: Call get_project to understand current structure.
+2. **If JS/Vue task**: Call \`get_stellify_framework_api\` to check for composables before writing custom code.
+3. Plan: Map out the solution before calling tools.
 4. Create: create_file, create_method (with body), create_statement_with_code
-5. Wire: html_to_elements (pass file UUID to auto-wire @click handlers)
-6. Finalize: save_file with template/data/statements arrays
-7. Verify: Call \`get_assembled_code\` to see the actual rendered output and fix any issues
-8. Test: Use run_code to execute methods and verify behavior. For UI components, use broadcast_element_command to demonstrate functionality in real-time.
-
-## Component Response Handling (IMPORTANT)
-
-When creating Vue/ React etc. components, ALWAYS check the \`appJs\` field in the response:
-
-1. **appJs.action_required === "create_or_select_mount_file"**: No mount file exists. You MUST immediately ask the user: "Would you like me to create an app.js mount file for this component?" Do NOT proceed without user confirmation.
-
-2. **appJs.action_required === "register_component"**: Mount file exists but component isn't registered. Call save_file on the mount file (appJs.uuid) to add the component UUID to its includes array.
-
-3. **No action_required**: Component is already registered in a mount file. Proceed normally.
+5. **Handle mount file**: Check \`appJs\` in create_file response. If \`action_required\` exists, ask user about mount file before proceeding.
+6. Wire: html_to_elements (pass file UUID to auto-wire @click handlers)
+7. Finalize: save_file with template/data/statements arrays (include frameworkImports for composables)
+8. Verify: Call \`get_assembled_code\` to check the output
+9. Test: Use run_code or broadcast_element_command to verify behavior
 `;
 
 // Legacy detailed instructions preserved as comments for reference if needed
@@ -1444,7 +1435,7 @@ When creating Vue/ React etc. components, ALWAYS check the \`appJs\` field in th
 const server = new Server(
   {
     name: 'stellify-mcp',
-    version: '0.1.33',
+    version: '0.1.34',
   },
   {
     capabilities: {
