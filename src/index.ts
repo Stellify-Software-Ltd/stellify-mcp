@@ -179,12 +179,12 @@ Pass 'includes' array for framework class dependencies (auto-resolved to UUIDs).
         },
         parameters: {
           type: 'array',
-          description: 'Method parameters (created as clauses)',
+          description: 'Method parameters (created as clauses). Include datatype for TypeScript annotations.',
           items: {
             type: 'object',
             properties: {
               name: { type: 'string', description: 'Parameter name' },
-              datatype: { type: 'string', description: 'Data type' },
+              datatype: { type: 'string', description: 'TypeScript type (e.g., "number", "string", "MouseEvent", "User"). Outputs as: (param: Type)' },
               type: { type: 'string', description: 'Clause type (default: variable)' },
               value: { type: 'string', description: 'Default value' },
             },
@@ -225,6 +225,8 @@ Pass 'includes' array for framework class dependencies (auto-resolved to UUIDs).
 
 **Nested code is handled correctly.** The parser tracks brace/bracket/paren depth and only splits on semicolons at the top level. Arrow functions with block bodies, computed properties, and other nested constructs work as single statements.
 
+Pass 'types' to specify TypeScript types for variables declared in the code.
+
 IMPORTANT: This APPENDS to existing method statements. To REPLACE a method's code entirely:
 1. Create a NEW method with create_method (with body parameter)
 2. Update the file's 'data' array to include new method UUID (remove old one)
@@ -244,6 +246,11 @@ IMPORTANT: This APPENDS to existing method statements. To REPLACE a method's cod
         code: {
           type: 'string',
           description: 'PHP code for the method body (just the statements, no function declaration). Example: "return $a + $b;"',
+        },
+        types: {
+          type: 'object',
+          description: 'Map of variable names to their base TypeScript types (e.g., { "result": "Todo" }). The assembler infers full types from code structure.',
+          additionalProperties: { type: 'string' },
         },
       },
       required: ['file', 'method', 'code'],
@@ -755,7 +762,12 @@ Prefer SVG icons over emoji (encoding issues).`,
   },
   {
     name: 'create_statement_with_code',
-    description: `Create a statement with code in one call. Preferred over two-step create_statement + add_statement_code.`,
+    description: `Create a statement with code in one call. Preferred over two-step create_statement + add_statement_code.
+
+Pass 'types' to specify TypeScript types for variables. The assembler infers the full type from code structure:
+- \`ref([])\` + type "Todo" → outputs \`const todos: Ref<Todo[]>\`
+- \`ref(0)\` + type "number" → outputs \`const count: Ref<number>\`
+- \`reactive({})\` + type "State" → outputs \`const state: State\``,
     inputSchema: {
       type: 'object',
       properties: {
@@ -770,6 +782,11 @@ Prefer SVG icons over emoji (encoding issues).`,
         method: {
           type: 'string',
           description: 'UUID of the method to add the statement to (optional, for method body statements)',
+        },
+        types: {
+          type: 'object',
+          description: 'Map of variable names to their base TypeScript types (e.g., { "todos": "Todo", "count": "number" }). The assembler infers Ref<>, arrays, etc. from the code structure.',
+          additionalProperties: { type: 'string' },
         },
       },
       required: ['file', 'code'],
@@ -894,6 +911,11 @@ Required: uuid, name, type. For significant changes, include context fields: sum
           type: 'array',
           items: { type: 'string' },
           description: 'Project model UUIDs (auto-namespaced). Do NOT duplicate in includes.',
+        },
+        frameworkImports: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Stellify framework modules to import (e.g., ["Http", "Form", "Collection"]). Auto-generates: import { Http, Form, Collection } from \'stellify-framework\';',
         },
         summary: {
           type: 'string',
@@ -1418,7 +1440,7 @@ When creating Vue/ React etc. components, ALWAYS check the \`appJs\` field in th
 const server = new Server(
   {
     name: 'stellify-mcp',
-    version: '0.1.31',
+    version: '0.1.32',
   },
   {
     capabilities: {

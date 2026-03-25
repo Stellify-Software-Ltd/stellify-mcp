@@ -36,6 +36,7 @@ export interface AddMethodBodyParams {
   file: string;
   method: string;
   code: string;
+  types?: Record<string, string>;
 }
 
 export interface SearchMethodsParams {
@@ -155,7 +156,7 @@ export class StellifyClient {
   }
 
   // NEW: Combined create statement with code in a single call
-  async createStatementWithCode(params: { file: string; code: string; method?: string }) {
+  async createStatementWithCode(params: { file: string; code: string; method?: string; types?: Record<string, string> }) {
     const response = await this.client.post('/statement/with-code', params);
     return response.data;
   }
