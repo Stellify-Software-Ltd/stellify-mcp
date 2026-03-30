@@ -1,3 +1,11 @@
+---
+name: wordpress-import
+description: "Use this skill when importing WordPress sites into Stellify. Invoke with /wordpress-import to start the guided workflow. Covers: analyzing WordPress exports, converting post types to Eloquent models, transforming PHP templates to Vue components, migrating forms and plugins, and creating routes and API endpoints."
+license: MIT
+metadata:
+  author: stellify
+---
+
 # WordPress Import Skill
 
 You are helping the user import a WordPress site into Stellify. Follow this workflow.
