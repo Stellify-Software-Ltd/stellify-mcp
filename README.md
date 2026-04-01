@@ -352,6 +352,20 @@ Search for routes/pages in the project by name.
 
 ---
 
+### Views & Blade Templates
+
+Stellify stores Blade views as elements instead of files. The root element's `name` field maps to the view name:
+
+- Element with `name="notes.index"` → `view('notes.index', $data)`
+- Element with `name="layouts.app"` → `@extends('layouts.app')`
+- Element with `name="components.card"` → `<x-card>`
+
+Use `update_element` to set the `name` on a root element after creating it with `html_to_elements`.
+
+**Convention for reusable templates:** Attach layouts, components, and partials to a template route (e.g., `/template/app-layout`, `/template/card`) to keep them organized and editable.
+
+---
+
 ### Element Tools (UI Components)
 
 #### `create_element`
@@ -441,7 +455,35 @@ Convert HTML to Stellify elements in ONE operation. This is the fastest way to b
 - `elements` (required): HTML string to convert
 - `page` (optional): Route UUID to attach elements to. Omit for Vue components.
 - `selection` (optional): Parent element UUID to attach to (alternative to page)
+- `file` (optional): Vue component file UUID. Pass this to auto-wire @click handlers to method UUIDs.
 - `test` (optional): If true, returns structure without creating elements
+
+**⚠️ CRITICAL: Multiple Root Elements**
+
+When passing HTML with **multiple root-level elements** (e.g., `<header>`, `<main>`, `<footer>`), only the **FIRST root element** gets attached to the route via `routeParent`. Other elements are created but become **orphaned** (not attached to the route).
+
+**Wrong approach (causes orphaned elements):**
+```
+html_to_elements(page: routeUUID, elements: "<header>...</header><main>...</main><footer>...</footer>")
+// Result: Only <header> is attached to the route. <main> and <footer> are orphaned!
+```
+
+**Correct approach (make separate calls for each root element):**
+```
+// Call 1: Header
+html_to_elements(page: routeUUID, elements: "<header>...</header>")
+
+// Call 2: Main content
+html_to_elements(page: routeUUID, elements: "<main>...</main>")
+
+// Call 3: Footer
+html_to_elements(page: routeUUID, elements: "<footer>...</footer>")
+```
+
+**Alternative approach (wrap in a single container):**
+```
+html_to_elements(page: routeUUID, elements: "<div class='min-h-screen flex flex-col'><header>...</header><main>...</main><footer>...</footer></div>")
+```
 
 **Features:**
 - Parses HTML structure

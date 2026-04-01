@@ -607,7 +607,7 @@ Use the returned UUID with html_to_elements (page parameter) or get_route for fu
   },
   {
     name: 'update_element',
-    description: `Update a UI element. Data object: tag, classes, text, event handlers (method UUIDs), classBindings. Include context for significant UI components.`,
+    description: `Update a UI element. Data object: tag, classes, text, event handlers (method UUIDs), classBindings. Set 'name' on root elements to create Blade views (e.g., name="notes.index" for view('notes.index')).`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -696,11 +696,45 @@ Note: To reorder elements, use update_element to modify the parent element's 'da
   },
   {
     name: 'html_to_elements',
-    description: `Convert HTML to Stellify elements. Returns element UUIDs to use in save_file template array.
+    description: `Convert HTML to Stellify elements.
 
-Auto-detects Vue bindings ({{ var }}). For Vue components, omit 'page'. For pages, provide route UUID.
+**IMPORTANT - Choose the right approach:**
+
+**For SSR/Blade Pages (WordPress imports, static content, layouts):**
+- MUST pass 'page' (route UUID) - elements attach to the route for server-side rendering
+- This is the most common use case
+
+**For Vue Components (client-side interactivity):**
+- Omit 'page' - elements are standalone, referenced by file's template array
+- Returns UUIDs to use in save_file's template array
+
+**Where elements go:**
+- Pass 'page' (route UUID): Elements attached to the route for SSR rendering
+- Pass 'selection' (element UUID): Elements attached as children of existing element
+- Omit both: Elements are standalone (Vue components only) - use returned UUIDs in save_file's template array
+
+**⚠️ CRITICAL: Multiple Root Elements Limitation**
+When HTML contains multiple root-level elements (e.g., <header>, <main>, <footer>), only the FIRST root element gets attached to the route. Other elements become orphaned!
+
+**WRONG:** \`html_to_elements(page: routeUUID, elements: "<header>...</header><main>...</main><footer>...</footer>")\`
+→ Only <header> attaches to route. <main> and <footer> are orphaned!
+
+**CORRECT:** Make separate calls for each root element:
+1. \`html_to_elements(page: routeUUID, elements: "<header>...</header>")\`
+2. \`html_to_elements(page: routeUUID, elements: "<main>...</main>")\`
+3. \`html_to_elements(page: routeUUID, elements: "<footer>...</footer>")\`
+
+**OR** wrap all elements in a single container div.
 
 **@click auto-wiring:** Pass 'file' UUID to auto-resolve @click="methodName" handlers. Methods must exist in the file first.
+
+**Blade Syntax Handling:**
+When element text or attributes contain Blade syntax like \`{{ $post->title }}\` or \`{!! $post->content !!}\`, do NOT store them as literal text. Instead:
+- Parse the Blade expression and create a statement/clause for it
+- Store the statement UUID in the element's \`statements\` array
+- The SSR assembler will evaluate these at render time
+
+For example, \`{{ $post->title }}\` should become a statement that references the \`$post\` variable and accesses its \`title\` property.
 
 Prefer SVG icons over emoji (encoding issues).`,
     inputSchema: {
@@ -712,11 +746,11 @@ Prefer SVG icons over emoji (encoding issues).`,
         },
         page: {
           type: 'string',
-          description: 'Route UUID to attach elements to. Optional for Vue components.',
+          description: 'Route UUID to attach elements to. REQUIRED for SSR/Blade pages (WordPress imports, static content, layouts). Only omit for Vue component templates.',
         },
         selection: {
           type: 'string',
-          description: 'Parent element UUID to attach to (alternative to page)',
+          description: 'Parent element UUID to attach to (alternative to page). Use when adding children to existing elements.',
         },
         file: {
           type: 'string',
@@ -1165,7 +1199,7 @@ Changes are EPHEMERAL (not saved). For persistent changes, use update_element or
         },
         api: {
           type: 'boolean',
-          description: 'Generate API-style responses (default: true)',
+          description: 'Generate API-style responses (default: true). Set to FALSE for SSR/Blade pages (controllers return views). Set to TRUE for API endpoints (controllers return JSON).',
         },
       },
       required: ['name'],
@@ -1417,16 +1451,39 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 
 - Files are stored as json. The json has a data key that references its methods (using uuids), and each method has a data key that references statements, and each statement has a data key that references clauses.
 
-## Workflow (follow every step)
-1. Research: Call get_project to understand current structure.
-2. **If JS/Vue task**: Call \`get_stellify_framework_api\` to check for composables before writing custom code.
-3. Plan: Map out the solution before calling tools.
-4. Create: create_file, create_method (with body), create_statement_with_code
-5. **Handle mount file**: Check \`appJs\` in create_file response. If \`action_required\` exists, ask user about mount file before proceeding.
-6. Wire: html_to_elements (pass file UUID to auto-wire @click handlers)
-7. Finalize: save_file with template/data/statements arrays (include frameworkImports for composables)
-8. Verify: Call \`get_assembled_code\` to check the output
-9. Test: Use run_code or broadcast_element_command to verify behavior
+## Choosing Between SSR Pages and Vue Components
+
+**Use SSR/Blade Pages (routes + elements) when:**
+- Building static pages, layouts, or content pages
+- Importing from WordPress, HTML templates, or static sites
+- No client-side interactivity needed beyond links/forms
+- SEO is important
+
+**Use Vue Components (files with type='js', extension='vue') when:**
+- Client-side interactivity is required (counters, toggles, dynamic forms)
+- Real-time updates needed
+- Complex state management
+
+**CRITICAL DIFFERENCE:**
+- SSR Pages: Elements attach directly to routes. Use \`html_to_elements\` with \`page\` parameter (route UUID). Elements render via Blade.
+- Vue Components: Elements are standalone, referenced by file's \`template\` array. Use \`html_to_elements\` WITHOUT \`page\` parameter.
+
+## Workflow for SSR Pages (most common)
+1. Research: Call get_project to understand current structure
+2. Create route: \`create_route\` for each page
+3. Add elements: \`html_to_elements\` with \`page\` parameter set to route UUID
+4. Wire controller (if needed): \`save_route\` with controller and controller_method UUIDs
+
+## Workflow for Vue Components (client-side interactivity)
+1. Research: Call get_project to understand current structure
+2. **Call \`get_stellify_framework_api\`** to check for composables before writing custom code
+3. Create file: \`create_file\` with type='js', extension='vue'
+4. Create methods: \`create_method\` (with body parameter)
+5. Create state: \`create_statement_with_code\` for refs/reactive
+6. Create template: \`html_to_elements\` WITHOUT \`page\` parameter (returns UUIDs)
+7. **Handle mount file**: Check \`appJs\` in create_file response. If \`action_required\` exists, ask user about mount file
+8. Finalize: \`save_file\` with template/data/statements arrays (include frameworkImports for composables)
+9. Verify: Call \`get_assembled_code\` to check the output
 `;
 
 // Legacy detailed instructions preserved as comments for reference if needed
