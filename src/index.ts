@@ -1492,7 +1492,7 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 const server = new Server(
   {
     name: 'stellify-mcp',
-    version: '0.1.34',
+    version: '0.1.35',
   },
   {
     capabilities: {
