@@ -6,12 +6,12 @@
     "url": "https://github.com/Stellify-Software-Ltd/stellify-mcp",
     "source": "github"
   },
-  "version": "0.1.36",
+  "version": "0.1.37",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@stellisoft/stellify-mcp",
-      "version": "0.1.36",
+      "version": "0.1.37",
       "transport": {
         "type": "stdio"
       },
