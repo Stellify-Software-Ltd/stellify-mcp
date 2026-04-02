@@ -374,11 +374,79 @@ Create a new UI element. Provide either `page` (route UUID) for root elements, o
 **Parameters:**
 - `type` (required): Element type - one of:
   - HTML5: `s-wrapper`, `s-input`, `s-form`, `s-svg`, `s-shape`, `s-media`, `s-iframe`
-  - Components: `s-loop`, `s-transition`, `s-freestyle`, `s-motion`
+  - Components: `s-transition`, `s-freestyle`, `s-motion`
   - Blade: `s-directive`
   - Shadcn/ui: `s-chart`, `s-table`, `s-combobox`, `s-accordion`, `s-calendar`, `s-contiguous`
 - `page` (optional): UUID of the page/route (for root elements)
 - `parent` (optional): UUID of the parent element (for child elements)
+
+**Using `s-directive` for Blade Conditionals:**
+
+`s-directive` elements output Blade directives (like `@if`, `@foreach`, `@endif`). They are **sibling elements** — they don't wrap children. To conditionally render content:
+
+1. Create an `s-directive` element with a statement for the opening directive (e.g., `@if(...)`)
+2. Create the content element(s) as the **next sibling(s)**
+3. Create another `s-directive` element with a statement for the closing directive (e.g., `@endif`)
+
+Example — conditionally showing an image:
+```
+// 1. Create statement for @if
+create_statement_with_code({
+  file: "<file-uuid>",
+  code: "@if($item->featured_image)"
+})
+
+// 2. Create opening directive element and set its statement
+create_element({ type: "s-directive", page: "<route-uuid>" })
+update_element({ uuid: "<if-directive-uuid>", data: { "statement": "<if-statement-uuid>" } })
+
+// 3. Create the image as the next sibling
+html_to_elements({ page: "<route-uuid>", elements: "<img class=\"w-full\" />" })
+// Then update with dynamic src:
+update_element({ uuid: "<img-uuid>", data: { "srcField": "featured_image" } })
+
+// 4. Create statement for @endif
+create_statement_with_code({ file: "<file-uuid>", code: "@endif" })
+
+// 5. Create closing directive element
+create_element({ type: "s-directive", page: "<route-uuid>" })
+update_element({ uuid: "<endif-directive-uuid>", data: { "statement": "<endif-statement-uuid>" } })
+```
+
+The three elements render in order as siblings:
+```blade
+@if($item->featured_image)
+<img class="w-full" src="{{ $item->featured_image }}" />
+@endif
+```
+
+**Using `s-directive` for Loops:**
+
+```
+// 1. Create @foreach directive
+create_statement_with_code({ file: "<file-uuid>", code: "@foreach($posts as $item)" })
+create_element({ type: "s-directive", page: "<route-uuid>" })
+update_element({ uuid: "<foreach-uuid>", data: { "statement": "<foreach-statement-uuid>" } })
+
+// 2. Create loop content (article with dynamic fields)
+html_to_elements({ page: "<route-uuid>", elements: "<article><h2></h2><p></p></article>" })
+// Update elements to use loop item fields:
+update_element({ uuid: "<h2-uuid>", data: { "textField": "title" } })  // → {{ $item->title }}
+update_element({ uuid: "<p-uuid>", data: { "textField": "excerpt" } }) // → {{ $item->excerpt }}
+
+// 3. Create @endforeach directive
+create_statement_with_code({ file: "<file-uuid>", code: "@endforeach" })
+create_element({ type: "s-directive", page: "<route-uuid>" })
+update_element({ uuid: "<endforeach-uuid>", data: { "statement": "<endforeach-statement-uuid>" } })
+```
+
+**Loop Item Attributes:**
+Inside `@foreach` loops, use these attributes on elements to reference `$item`:
+- `textField: "fieldName"` → outputs `{{ $item->fieldName }}`
+- `hrefField: "fieldName"` → outputs `href="{{ $item->fieldName }}"`
+- `srcField: "fieldName"` → outputs `src="{{ $item->fieldName }}"`
+- `hrefExpression: "{{ route('posts.show', $item->slug) }}"` → for complex expressions
+- `srcExpression`, `altExpression` → same pattern for other attributes
 
 ---
 
@@ -397,7 +465,18 @@ Update an existing UI element.
 - `locked`: Prevent editing (boolean)
 - `tag`: HTML tag (div, input, button, etc.)
 - `classes`: CSS classes array `["class1", "class2"]`
-- `text`: Element text content
+- `text`: Static text content
+- `statements`: Array of statement UUIDs for dynamic Blade content
+
+**Loop item fields** (for elements inside `@foreach` loops, references `$item`):
+- `textField`: Field name → outputs `{{ $item->fieldName }}`
+- `hrefField`: Field name → outputs `href="{{ $item->fieldName }}"`
+- `srcField`: Field name → outputs `src="{{ $item->fieldName }}"`
+
+**Expression attributes** (for complex Blade expressions):
+- `hrefExpression`: Full Blade expression for href (e.g., `"{{ route('posts.show', $item->slug) }}"`)
+- `srcExpression`: Full Blade expression for src
+- `altExpression`: Full Blade expression for alt
 
 **Event handlers** (set value to method UUID):
 - `click`: @click
@@ -478,11 +557,6 @@ html_to_elements(page: routeUUID, elements: "<main>...</main>")
 
 // Call 3: Footer
 html_to_elements(page: routeUUID, elements: "<footer>...</footer>")
-```
-
-**Alternative approach (wrap in a single container):**
-```
-html_to_elements(page: routeUUID, elements: "<div class='min-h-screen flex flex-col'><header>...</header><main>...</main><footer>...</footer></div>")
 ```
 
 **Features:**

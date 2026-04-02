@@ -12,10 +12,6 @@ You are importing a WordPress site into Stellify by reading its PHP theme files 
 
 **Match the rendering approach of the WordPress site.** If content is server-rendered in WordPress (which most of it will be — posts, pages, archives, navigation), create Blade templates. If a feature uses JavaScript for client-side interactivity (AJAX forms, dynamic filtering, live search, infinite scroll, modals, sliders), create a Vue component for that specific piece. The default is Blade — only reach for Vue when the WordPress source is doing something that genuinely requires JS.
 
-## Step 0 — Discover Tools
-
-List all available Stellify MCP tools. Understand what each tool does, what parameters it requires, and any dependencies between them (e.g. you need a file before you can add methods to it, you need a method before you can add statements). Print a summary of the tools and their creation order.
-
 ## Step 1 — Identify the Active Theme
 
 Look in `./wp-content/themes/` to find the active theme. If there are multiple themes, check for the most recently modified one, or the one with the most template files. If unsure, ask which theme to import.
@@ -60,60 +56,13 @@ Read functions.php thoroughly. Extract:
 
 ## Step 4 — Plan the Laravel Structure
 
-Before calling any Stellify tools, write out the full plan:
+Before calling any Stellify tools, plan:
 
-### Models
-- Post (always — WordPress core)
-- Page (always — WordPress core)
-- Category, Tag (if used)
-- Any custom post types found in Step 3
-- User (if the theme has author pages)
-
-### Controllers
-- PostController (index, show) — handles blog listing and single posts
-- PageController (show) — handles static pages
-- One controller per custom post type
-- HomeController — if front-page.php or a static homepage exists
-- SearchController — if search.php exists
-
-### Routes (web.php)
-Map the WordPress URL structure:
-- `/` → HomeController or PostController@index
-- `/blog` or `/posts` → PostController@index (if static homepage)
-- `/{post-slug}` → PostController@show
-- `/{page-slug}` → PageController@show
-- `/category/{slug}` → PostController@index (filtered)
-- `/tag/{slug}` → PostController@index (filtered)
-- `/search` → SearchController@index
-- Custom post type archives and singles
-
-### Blade Views
-Everything is Blade. The directory structure should be:
-```
-layouts/
-  app.blade.php          ← from header.php + footer.php
-posts/
-  index.blade.php        ← from archive.php or index.php
-  show.blade.php         ← from single.php
-pages/
-  show.blade.php         ← from page.php
-partials/
-  nav.blade.php          ← from wp_nav_menu output
-  sidebar.blade.php      ← from sidebar.php
-  post-card.blade.php    ← from template-parts/content.php
-  comments.blade.php     ← from comments.php
-  search-form.blade.php  ← from searchform.php
-errors/
-  404.blade.php          ← from 404.php
-```
-
-### Migrations (Mode B only)
-If the user chose Mode B (fresh database), plan one migration per model with fields derived from:
-- WordPress core fields: title, slug, content, excerpt, featured_image, status, published_at
-- Custom fields from `get_post_meta()` calls found in templates
-- Any ACF or custom meta boxes registered in functions.php
-
-If the user chose Mode A (existing database), skip migrations entirely — the tables already exist.
+- **Models:** One per post type (Post, Page, plus any custom types from Step 3)
+- **Controllers:** One per model with index/show actions
+- **Routes:** Match WordPress URL structure (archive at `/`, singles at `/{slug}`, taxonomies at `/category/{slug}`)
+- **Views:** Mirror WordPress template hierarchy — layout from header+footer, index/show views per post type, partials from template-parts
+- **Migrations (Mode B only):** One per model with fields from WordPress core + any custom fields found in templates
 
 ## Step 5 — Build in Stellify (Order of Operations)
 
@@ -211,52 +160,58 @@ Translate WordPress functions to Blade:
 - `language_attributes()` → `lang="{{ str_replace('_', '-', app()->getLocale()) }}"`
 
 ### 5e. Create Blade Views
-For each WordPress template file, read the PHP and create the equivalent Blade view. **All views use `@extends('layouts.app')` and `@section('content')`.**
+For each WordPress template file, read the PHP and create the equivalent Blade view using `html_to_elements`. **All views use `@extends('layouts.app')` and `@section('content')`.**
+
+**⚠️ Multiple Root Elements:** When converting HTML with multiple root-level elements (e.g., `<header>`, `<main>`, `<footer>`), only the first root element gets attached to the route. Make separate `html_to_elements` calls for each root element.
 
 **WordPress → Blade translation guide:**
 
-The Blade column depends on which database mode was chosen. Mode A uses WordPress column names directly; Mode B uses clean Laravel names.
+Mode A uses WordPress column names; Mode B uses clean Laravel names.
 
-| WordPress | Blade (Mode A — existing DB) | Blade (Mode B — fresh DB) |
-|-----------|------------------------------|---------------------------|
-| `the_title()` | `{{ $post->post_title }}` | `{{ $post->title }}` |
-| `the_content()` | `{!! $post->post_content !!}` | `{!! $post->content !!}` |
-| `the_excerpt()` | `{{ $post->post_excerpt }}` | `{{ $post->excerpt }}` |
-| `the_permalink()` | `{{ route('posts.show', $post->post_name) }}` | `{{ route('posts.show', $post->slug) }}` |
-| `the_post_thumbnail()` | via `wp_postmeta` lookup | `<img src="{{ asset('storage/' . $post->featured_image) }}" />` |
-| `the_date()` / `the_time()` | `{{ \Carbon\Carbon::parse($post->post_date)->format('d M Y') }}` | `{{ $post->published_at->format('d M Y') }}` |
-| `the_author()` | `{{ $post->author->display_name }}` | `{{ $post->author->name }}` |
-| `comments_template()` | `@include('partials.comments', ['post' => $post])` | same |
-| `get_template_part('content')` | `@include('partials.post-card', ['post' => $post])` | same |
-| `have_posts() / the_post()` | Use an `s-loop` element (see below) | same |
-| `wp_link_pages()` | `{{ $posts->links() }}` | same |
-| `get_search_form()` | `@include('partials.search-form')` | same |
-| `wp_nav_menu()` | `@include('partials.nav')` | same |
-| `get_header()` / `get_footer()` | handled by `@extends('layouts.app')` | same |
-| `esc_html()` / `esc_attr()` | `{{ }}` (Blade auto-escapes) | same |
-| `wp_kses_post()` | `{!! !!}` (for trusted HTML content) | same |
+**IMPORTANT:** Inside `@foreach` loops, use `$item` as the loop variable. This matches the Stellify assembler's expectations for `textField`, `hrefField`, `srcField` attributes.
 
-**Stellify `s-loop` elements for iteration:**
+| WordPress | Blade (Mode A) | Blade (Mode B) | Stellify Attribute |
+|-----------|----------------|----------------|-------------------|
+| `the_title()` | `{{ $item->post_title }}` | `{{ $item->title }}` | `textField: "title"` |
+| `the_content()` | `{!! $item->post_content !!}` | `{!! $item->content !!}` | statement with code |
+| `the_excerpt()` | `{{ $item->post_excerpt }}` | `{{ $item->excerpt }}` | `textField: "excerpt"` |
+| `the_permalink()` | `{{ route('posts.show', $item->post_name) }}` | `{{ route('posts.show', $item->slug) }}` | `hrefExpression: "..."` |
+| `the_date()` | `{{ $item->post_date->format('d M Y') }}` | `{{ $item->published_at->format('d M Y') }}` | statement with code |
+| `the_author()` | `{{ $item->author->display_name }}` | `{{ $item->author->name }}` | statement with code |
+| `get_template_part()` | `@include('partials.post-card', ['post' => $item])` | same | s-directive |
+| `have_posts()` | `@foreach($posts as $item)` | same | s-directive pair |
 
-WordPress's "The Loop" (`have_posts() / the_post()`) requires two things in Stellify:
+**Conditional Rendering with `s-directive`:**
 
-1. **Set the element type to `s-loop`** using `update_element` with `type: "s-loop"` and `variable` set to the collection name from the controller's return array. This tells Stellify to iterate over that variable and pass each item as `$item` to child elements.
+WordPress blocks that render conditionally (like `<!-- wp:post-featured-image -->`) use `s-directive` elements. See the MCP tool documentation for the sibling pattern — create an opening directive, content elements, then a closing directive as siblings.
 
-2. **Write the `@foreach` in the Blade template as well.** The Blade content inside the element still needs the `@foreach` loop.
+Common WordPress conditionals to convert (use `$item` inside loops):
+- `<!-- wp:post-featured-image -->` → `@if($item->featured_image)` ... `@endif`
+- `<!-- wp:post-excerpt -->` → `@if($item->post_excerpt)` ... `@endif`
+- `<!-- wp:post-comments -->` → `@if($item->comments->count() > 0)` ... `@endif`
+- `<!-- wp:query-no-results -->` → `@if($posts->isEmpty())` ... `@endif` (outside loop)
 
-Example: If the controller returns `['posts' => Post::paginate(10)]`, the element that lists posts should be updated to:
-```json
-{
-  "uuid": "<element-uuid>",
-  "data": {
-    "type": "s-loop",
-    "variable": "posts"
-  }
-}
+**Iteration (The Loop):**
+
+WordPress's "The Loop" (`have_posts() / the_post()`) maps to `@foreach` directives. Use `s-directive` elements for the opening `@foreach` and closing `@endforeach`.
+
+**IMPORTANT - Loop Variable:** The default loop variable is `$item`. When creating elements inside a loop:
+1. Do NOT pass raw Blade syntax to `html_to_elements` — it will be stored literally
+2. Create clean HTML first, then use `update_element` to add dynamic attributes:
+   - `textField: "title"` → outputs `{{ $item->title }}`
+   - `hrefField: "slug"` → outputs `href="{{ $item->slug }}"`
+   - `srcField: "featured_image"` → outputs `src="{{ $item->featured_image }}"`
+3. For complex expressions (route helpers, method calls), use:
+   - `hrefExpression: "{{ route('posts.show', $item->slug) }}"`
+   - `srcExpression: "{{ $item->featured_image }}"`
+4. For text with Blade code, create a statement with `create_statement_with_code`, then add its UUID to the element's `statements` array via `update_element`
+
+Example loop structure using `s-directive` siblings:
 ```
-And the Blade content inside uses `@foreach($posts as $post)` ... `@endforeach` as normal.
-
-This applies to any listing — post archives, category pages, search results, related posts, comment lists, navigation menu items, etc.
+1. s-directive with statement: "@foreach($posts as $item)"
+2. article element (content to repeat)
+3. s-directive with statement: "@endforeach"
+```
 
 ### 5f. Create Partials & Components
 Convert template-parts/ files into Blade partials using `@include`. Static partials receive data via the second argument: `@include('partials.post-card', ['post' => $post])`. If a template part relies on JavaScript for interactivity (e.g. a slider, a filterable gallery, a live search form), create a Vue component instead and ensure it is registered and mounted in `app.js`.
@@ -267,18 +222,9 @@ Do not try to port WordPress CSS. Read the visual intent from the theme's CSS/th
 - WordPress navigation → `<nav class="flex items-center gap-6">`
 - WordPress post grid → `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">`
 
-## Step 6 — Review
+## Step 6 — Review (Optional)
 
-After building everything, print a summary:
-- Database mode chosen (A or B)
-- Total models created (and which WordPress tables they map to, if Mode A)
-- Total controllers and methods
-- Total routes
-- Total Blade views and partials
-- Total Vue components (if any) and why each was needed
-- Any WordPress features that could NOT be mapped (e.g. specific plugins, shortcodes with no equivalent)
-- If Mode B: provide a SQL migration query or artisan command to copy content from the WordPress database to the new schema
-- Suggestions for manual follow-up
+If requested, summarize what was created and note any WordPress features that couldn't be mapped.
 
 ## Important Rules
 

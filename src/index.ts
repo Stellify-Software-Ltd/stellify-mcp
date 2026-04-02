@@ -580,16 +580,15 @@ Use the returned UUID with html_to_elements (page parameter) or get_route for fu
   },
   {
     name: 'create_element',
-    description: `Create a UI element. Provide page (route UUID) for root elements, or parent (element UUID) for children. Use s-loop for v-for elements.`,
+    description: `Create a UI element. Provide page (route UUID) for root elements, or parent (element UUID) for children.`,
     inputSchema: {
       type: 'object',
       properties: {
         type: {
           type: 'string',
           enum: [
-            's-wrapper', 's-input', 's-form', 's-svg', 's-shape', 's-media', 's-iframe',
-            's-loop', 's-transition', 's-freestyle', 's-motion',
-            's-directive'
+            's-wrapper', 's-input', 's-form', 's-svg', 's-shape', 's-media',
+            's-freestyle', 's-directive'
           ],
           description: 'Element type - must be one of the valid Stellify element types',
         },
@@ -607,7 +606,24 @@ Use the returned UUID with html_to_elements (page parameter) or get_route for fu
   },
   {
     name: 'update_element',
-    description: `Update a UI element. Data object: tag, classes, text, event handlers (method UUIDs), classBindings. Set 'name' on root elements to create Blade views (e.g., name="notes.index" for view('notes.index')).`,
+    description: `Update a UI element. Data object: tag, classes, text, event handlers (method UUIDs), classBindings. Set 'name' on root elements to create Blade views (e.g., name="notes.index" for view('notes.index')).
+
+**For elements inside @foreach loops (SSR/Blade):**
+Use these attributes to reference the loop variable (defaults to \`$item\`):
+- \`textField\`: Field name for text content → outputs \`{{ $item->fieldName }}\`
+- \`hrefField\`: Field name for href → outputs \`href="{{ $item->fieldName }}"\`
+- \`srcField\`: Field name for src → outputs \`src="{{ $item->fieldName }}"\`
+
+**For complex Blade expressions in attributes:**
+Use expression attributes when you need more than simple field access (e.g., route helpers, method calls):
+- \`hrefExpression\`: Blade expression for href → outputs \`href="..."\` with the expression
+- \`srcExpression\`: Blade expression for src → outputs \`src="..."\` with the expression
+- \`altExpression\`: Blade expression for alt → outputs \`alt="..."\` with the expression
+
+Example: \`hrefExpression: "{{ route('posts.show', $item->slug) }}"\`
+
+**For Blade text content:**
+Use the \`statements\` array with statement UUIDs containing Blade code. The statement's \`code\` property will be output directly for Blade to evaluate.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -729,12 +745,16 @@ When HTML contains multiple root-level elements (e.g., <header>, <main>, <footer
 **@click auto-wiring:** Pass 'file' UUID to auto-resolve @click="methodName" handlers. Methods must exist in the file first.
 
 **Blade Syntax Handling:**
-When element text or attributes contain Blade syntax like \`{{ $post->title }}\` or \`{!! $post->content !!}\`, do NOT store them as literal text. Instead:
-- Parse the Blade expression and create a statement/clause for it
-- Store the statement UUID in the element's \`statements\` array
-- The SSR assembler will evaluate these at render time
+For SSR/Blade pages, do NOT pass raw Blade expressions in text or attributes. The HTML parser stores them literally which causes rendering issues. Instead:
 
-For example, \`{{ $post->title }}\` should become a statement that references the \`$post\` variable and accesses its \`title\` property.
+1. **For static HTML:** Pass clean HTML without Blade syntax, then use \`update_element\` to add dynamic behavior
+2. **For loop content:** After creating elements, use \`update_element\` with:
+   - \`textField\`, \`hrefField\`, \`srcField\` for simple field access (outputs \`{{ $item->field }}\`)
+   - \`hrefExpression\`, \`srcExpression\`, \`altExpression\` for complex expressions
+   - \`statements\` array with statement UUIDs for text content with Blade code
+3. **For conditionals:** Use \`s-directive\` elements as siblings (see update_element docs)
+
+**Loop variable:** Inside \`@foreach\` loops created with \`s-directive\`, the default loop variable is \`$item\`. Use \`textField: "title"\` to output \`{{ $item->title }}\`.
 
 Prefer SVG icons over emoji (encoding issues).`,
     inputSchema: {
