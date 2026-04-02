@@ -72,6 +72,17 @@ Execute the plan using Stellify MCP tools in this order. This order matters — 
 
 Use the `create_resources` tool with `api: false` to generate models and controllers together. The `api: false` flag ensures controller methods return data arrays (for Blade views) rather than JSON responses.
 
+**Route Model Binding with Slugs:** WordPress URLs use slugs (e.g., `/post/my-article-title`). After creating each model with a `slug` field, add a `getRouteKeyName()` method so Laravel's route model binding works correctly:
+
+```php
+public function getRouteKeyName(): string
+{
+    return 'slug';
+}
+```
+
+Add this method to **Post**, **Category**, **Tag**, and any custom post type models that use slugs in their URLs. Without this, routes like `/post/{post}` will try to look up by ID instead of slug, causing 404 errors.
+
 **If Mode A (connect to existing WordPress database):**
 
 Create resources that map to the existing WordPress tables. No migrations. Set the model's table and primary key to match WordPress.
@@ -81,7 +92,13 @@ Create resources that map to the existing WordPress tables. No migrations. Set t
 class Post extends Model {
     protected $table = 'wp_posts';
     protected $primaryKey = 'ID';
-    
+
+    // Enable slug-based route model binding (WordPress uses post_name for slugs)
+    public function getRouteKeyName(): string
+    {
+        return 'post_name';
+    }
+
     // Scope to only published posts (not revisions, drafts, etc.)
     public function scopePublished($query) {
         return $query->where('post_status', 'publish')
@@ -109,6 +126,15 @@ In Blade templates, use WordPress column names:
 **If Mode B (fresh database):**
 
 Create new resources with clean Laravel migrations for each model identified in Step 4. Use clean column names (`title`, `slug`, `content`, `excerpt`, `status`, `published_at`, etc.). After the import is complete, suggest a data migration SQL query or artisan command that maps data from the WordPress tables to the new schema.
+
+For each model with a `slug` field, add `getRouteKeyName()`:
+
+```php
+public function getRouteKeyName(): string
+{
+    return 'slug';
+}
+```
 
 ### 5b. Refine Controller Methods
 

@@ -611,16 +611,24 @@ Use the returned UUID with html_to_elements (page parameter) or get_route for fu
 **For elements inside @foreach loops (SSR/Blade):**
 Use these attributes to reference the loop variable (defaults to \`$item\`):
 - \`textField\`: Field name for text content → outputs \`{{ $item->fieldName }}\`
-- \`hrefField\`: Field name for href → outputs \`href="{{ $item->fieldName }}"\`
+- \`hrefField\`: Field name for href → outputs \`href="{{ $item->fieldName }}"\` (field value ONLY, no prefix)
 - \`srcField\`: Field name for src → outputs \`src="{{ $item->fieldName }}"\`
 
+**For hrefs with path prefixes (IMPORTANT):**
+\`hrefField\` outputs ONLY the field value. There is NO \`hrefPrefix\` attribute.
+For links like \`/post/slug-here\`, you MUST use \`hrefExpression\`:
+- \`hrefExpression: "/post/{{ $item->slug }}"\` → outputs \`href="/post/{{ $item->slug }}"\`
+- \`hrefExpression: "/category/{{ $item->slug }}"\` → outputs \`href="/category/{{ $item->slug }}"\`
+
 **For complex Blade expressions in attributes:**
-Use expression attributes when you need more than simple field access (e.g., route helpers, method calls):
+Use expression attributes when you need more than simple field access:
 - \`hrefExpression\`: Blade expression for href → outputs \`href="..."\` with the expression
 - \`srcExpression\`: Blade expression for src → outputs \`src="..."\` with the expression
 - \`altExpression\`: Blade expression for alt → outputs \`alt="..."\` with the expression
 
-Example: \`hrefExpression: "{{ route('posts.show', $item->slug) }}"\`
+Examples:
+- Path prefix: \`hrefExpression: "/post/{{ $item->slug }}"\`
+- Route helper: \`hrefExpression: "{{ route('posts.show', $item->slug) }}"\`
 
 **For Blade text content:**
 Use the \`statements\` array with statement UUIDs containing Blade code. The statement's \`code\` property will be output directly for Blade to evaluate.`,
@@ -750,9 +758,13 @@ For SSR/Blade pages, do NOT pass raw Blade expressions in text or attributes. Th
 1. **For static HTML:** Pass clean HTML without Blade syntax, then use \`update_element\` to add dynamic behavior
 2. **For loop content:** After creating elements, use \`update_element\` with:
    - \`textField\`, \`hrefField\`, \`srcField\` for simple field access (outputs \`{{ $item->field }}\`)
-   - \`hrefExpression\`, \`srcExpression\`, \`altExpression\` for complex expressions
+   - \`hrefExpression\`, \`srcExpression\`, \`altExpression\` for paths with prefixes or complex expressions
    - \`statements\` array with statement UUIDs for text content with Blade code
 3. **For conditionals:** Use \`s-directive\` elements as siblings (see update_element docs)
+
+**IMPORTANT - Links with path prefixes:**
+\`hrefField\` outputs ONLY the field value with no prefix. There is NO \`hrefPrefix\` attribute.
+For links like \`/post/my-slug\`, use \`hrefExpression: "/post/{{ $item->slug }}"\` instead.
 
 **Loop variable:** Inside \`@foreach\` loops created with \`s-directive\`, the default loop variable is \`$item\`. Use \`textField: "title"\` to output \`{{ $item->title }}\`.
 
