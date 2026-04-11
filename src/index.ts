@@ -142,6 +142,11 @@ Pass 'includes' array for framework class dependencies (auto-resolved to UUIDs).
           type: 'string',
           description: 'Optional module name to group this file with related code (e.g., "blog-posts", "user-auth"). Module is auto-created if it doesn\'t exist.',
         },
+        attributes: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'PHP 8 class-level attributes (e.g., ["Fillable([\'name\', \'email\'])"], ["ObservedBy(UserObserver::class)"]). Use search_attributes tool to find available attributes.',
+        },
       },
       required: ['directory', 'name', 'type'],
     },
@@ -215,6 +220,11 @@ Pass 'includes' array for framework class dependencies (auto-resolved to UUIDs).
         decisions: {
           type: 'array',
           description: 'Context: Design decisions',
+          items: { type: 'string' },
+        },
+        attributes: {
+          type: 'array',
+          description: 'PHP 8 attributes for the method (e.g., ["Route(\\"/api/users\\")"], ["Middleware(\\"auth\\")"]). Use search_attributes tool to find available attributes.',
           items: { type: 'string' },
         },
       },
@@ -333,6 +343,11 @@ For significant changes, include context fields: summary, rationale, references,
           description: 'Context: Design decisions made',
           items: { type: 'string' },
         },
+        attributes: {
+          type: 'array',
+          description: 'PHP 8 attributes for the method (e.g., ["Route(\\"/api/users\\")"], ["Middleware(\\"auth\\")"]). Use search_attributes tool to find available attributes.',
+          items: { type: 'string' },
+        },
       },
       required: ['uuid'],
     },
@@ -352,6 +367,32 @@ For significant changes, include context fields: summary, rationale, references,
           description: 'Optional: filter results to a specific file',
         },
       },
+    },
+  },
+  {
+    name: 'search_attributes',
+    description: `Search for available PHP 8 attributes in Laravel. Returns attribute suggestions with descriptions, namespaces, targets (class/method/property/parameter), and expected arguments.
+
+Use this before adding attributes to files or methods to find the correct attribute name and syntax.
+
+Example queries:
+- "fillable" → finds Fillable attribute for models
+- "middleware" → finds Middleware attribute for controllers
+- "queue" → finds Queue, Tries, Timeout attributes for jobs`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search term to match against attribute names (e.g., "fillable", "middleware", "tries")',
+        },
+        target: {
+          type: 'string',
+          enum: ['class', 'method', 'property', 'parameter'],
+          description: 'Filter attributes by where they can be applied. Default: returns all.',
+        },
+      },
+      required: ['query'],
     },
   },
   {
@@ -1005,6 +1046,11 @@ Required: uuid, name, type. For significant changes, include context fields: sum
           description: 'Context: Design decisions',
           items: { type: 'string' },
         },
+        attributes: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'PHP 8 class-level attributes (e.g., ["Fillable([\'name\', \'email\'])"], ["ObservedBy(UserObserver::class)"]). Use search_attributes tool to find available attributes.',
+        },
       },
       required: ['uuid', 'name', 'type'],
     },
@@ -1524,7 +1570,7 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 const server = new Server(
   {
     name: 'stellify-mcp',
-    version: '0.1.38',
+    version: '0.1.39',
   },
   {
     capabilities: {
@@ -1692,6 +1738,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: JSON.stringify({
                 success: true,
                 results: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'search_attributes': {
+        const result = await stellify.searchAttributes(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                ...result,
               }, null, 2),
             },
           ],

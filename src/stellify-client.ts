@@ -13,6 +13,7 @@ export interface CreateFileParams {
   extension?: string;
   code?: string; // Complete PHP code to analyze for dependencies
   auto_create_dependencies?: boolean; // If true, create missing dependencies from code
+  attributes?: string[]; // PHP 8 class-level attributes (e.g., ["Fillable(['name', 'email'])"])
 }
 
 export interface CreateMethodParams {
@@ -30,6 +31,7 @@ export interface CreateMethodParams {
     value?: string;
   }>;
   body?: string; // NEW: Method body code - if provided, automatically parses and adds code
+  attributes?: string[]; // PHP 8 attributes (e.g., ["Deprecated", "Route('/api/users')"])
 }
 
 export interface AddMethodBodyParams {
@@ -431,6 +433,15 @@ export class StellifyClient {
   // Code Assembly - get rendered source code for a file
   async getAssembledCode(uuid: string) {
     const response = await this.client.get(`/file/${uuid}/source`);
+    return response.data;
+  }
+
+  // Search PHP 8 attributes - returns suggestions based on query and target
+  async searchAttributes(params: {
+    query: string;
+    target?: 'class' | 'method' | 'property' | 'parameter';
+  }) {
+    const response = await this.client.get('/attributes/search', { params });
     return response.data;
   }
 
