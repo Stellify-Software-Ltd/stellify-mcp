@@ -375,16 +375,27 @@ For significant changes, include context fields: summary, rationale, references,
 
 Use this before adding attributes to files or methods to find the correct attribute name and syntax.
 
-Example queries:
-- "fillable" → finds Fillable attribute for models
-- "middleware" → finds Middleware attribute for controllers
-- "queue" → finds Queue, Tries, Timeout attributes for jobs`,
+**Three modes of operation:**
+
+1. **List categories** (no params): Returns all available attribute categories
+   - Call with no arguments to discover categories like "eloquent", "queue", "routing"
+
+2. **List category attributes** (category only): Returns all attributes in a category
+   - Example: category="eloquent" → returns Fillable, Hidden, ObservedBy, etc.
+
+3. **Search by query** (query provided): Searches attribute names
+   - Example: query="fill" → finds Fillable attribute
+   - Can combine with category to search within a specific category`,
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'Search term to match against attribute names (e.g., "fillable", "middleware", "tries")',
+          description: 'Search term to match against attribute names (e.g., "fillable", "middleware", "tries"). Optional - omit to list categories or all attributes in a category.',
+        },
+        category: {
+          type: 'string',
+          description: 'Filter to a specific category (e.g., "eloquent", "queue", "routing", "console", "container", "request", "testing", "resource", "factory"). When provided without query, returns all attributes in that category.',
         },
         target: {
           type: 'string',
@@ -392,7 +403,6 @@ Example queries:
           description: 'Filter attributes by where they can be applied. Default: returns all.',
         },
       },
-      required: ['query'],
     },
   },
   {
@@ -1570,7 +1580,7 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 const server = new Server(
   {
     name: 'stellify-mcp',
-    version: '0.1.39',
+    version: '0.1.40',
   },
   {
     capabilities: {

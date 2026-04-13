@@ -436,9 +436,10 @@ export class StellifyClient {
     return response.data;
   }
 
-  // Search PHP 8 attributes - returns suggestions based on query and target
+  // Search PHP 8 attributes - returns categories, category attributes, or search results
   async searchAttributes(params: {
-    query: string;
+    query?: string;
+    category?: string;
     target?: 'class' | 'method' | 'property' | 'parameter';
   }) {
     const response = await this.client.get('/attributes/search', { params });
