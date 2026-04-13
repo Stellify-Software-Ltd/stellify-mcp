@@ -406,6 +406,54 @@ Use this before adding attributes to files or methods to find the correct attrib
     },
   },
   {
+    name: 'analyze_attributes',
+    description: `Analyze PHP 8 attribute usage across a Stellify project. Useful for auditing, finding missing attributes, and searching attribute values.
+
+**Three modes:**
+
+1. **usage** (default): List all attributes used in the project with counts
+   - Optional: file_type to filter (e.g., "model", "controller")
+   - Returns: attribute names, counts, and files using each
+
+2. **missing**: Find files of a specific type missing a required attribute
+   - Required: file_type (e.g., "model", "class")
+   - Required: attribute name (e.g., "Fillable", "FailOnUnknownFields")
+   - Returns: files missing vs having the attribute
+
+3. **search**: Find files where an attribute contains a specific value
+   - Required: attribute name
+   - Optional: value to search for in attribute args
+   - Optional: file_type to filter
+   - Returns: matching files with their attribute values
+
+Example queries:
+- "Find every FormRequest missing FailOnUnknownFields": mode=missing, file_type=class, attribute=FailOnUnknownFields
+- "Find models where 'email' is fillable": mode=search, attribute=Fillable, value=email
+- "List all attributes used": mode=usage`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mode: {
+          type: 'string',
+          enum: ['usage', 'missing', 'search'],
+          description: 'Analysis mode: "usage" (list all attributes), "missing" (find files missing an attribute), "search" (find files with specific attribute value). Default: usage.',
+        },
+        file_type: {
+          type: 'string',
+          description: 'Filter by file type (e.g., "model", "controller", "class", "middleware").',
+        },
+        attribute: {
+          type: 'string',
+          description: 'Attribute name to analyze (required for "missing" and "search" modes).',
+        },
+        value: {
+          type: 'string',
+          description: 'Value to search for in attribute arguments (for "search" mode).',
+        },
+      },
+    },
+  },
+  {
     name: 'delete_method',
     description: 'Delete a method from a file by UUID. This permanently removes the method and all its code. Requires both the file UUID and method UUID.',
     inputSchema: {
@@ -1580,7 +1628,7 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 const server = new Server(
   {
     name: 'stellify-mcp',
-    version: '0.1.40',
+    version: '0.1.41',
   },
   {
     capabilities: {
@@ -1756,6 +1804,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'search_attributes': {
         const result = await stellify.searchAttributes(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                ...result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'analyze_attributes': {
+        const result = await stellify.analyzeAttributes(args as any);
         return {
           content: [
             {

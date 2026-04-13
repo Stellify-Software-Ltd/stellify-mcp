@@ -446,4 +446,15 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Analyze PHP 8 attribute usage across a project
+  async analyzeAttributes(params: {
+    mode?: 'usage' | 'missing' | 'search';
+    file_type?: string;
+    attribute?: string;
+    value?: string;
+  }) {
+    const response = await this.client.get('/attributes/analyze', { params });
+    return response.data;
+  }
+
 }
