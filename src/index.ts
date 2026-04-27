@@ -550,8 +550,8 @@ Route params like {id} auto-inject into controller method parameters when names 
         },
         type: {
           type: 'string',
-          enum: ['web', 'api'],
-          description: 'Route type: "web" for pages, "api" for API endpoints',
+          enum: ['web', 'api', 'channels', 'view'],
+          description: 'Route type: "web" for pages, "api" for API endpoints, "channels" for WebSocket channels, "view" for Blade views',
           default: 'web',
         },
         controller: {
@@ -618,7 +618,7 @@ Use this to look up a route you created or to find existing routes in the projec
         },
         type: {
           type: 'string',
-          enum: ['web', 'api'],
+          enum: ['web', 'api', 'channels', 'view'],
         },
         method: {
           type: 'string',
@@ -685,8 +685,8 @@ Use the returned UUID with html_to_elements (page parameter) or get_route for fu
         },
         type: {
           type: 'string',
-          enum: ['web', 'api'],
-          description: 'Filter by route type: "web" for pages, "api" for endpoints',
+          enum: ['web', 'api', 'channels', 'view'],
+          description: 'Filter by route type: "web" for pages, "api" for endpoints, "channels" for WebSocket channels, "view" for Blade views',
         },
         per_page: {
           type: 'number',
@@ -1667,7 +1667,7 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 const server = new Server(
   {
     name: 'stellify-mcp',
-    version: '0.1.41',
+    version: '0.1.43',
   },
   {
     capabilities: {
