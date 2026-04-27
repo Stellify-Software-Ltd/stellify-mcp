@@ -457,4 +457,10 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Foundation packages - install pre-built packages into a project
+  async installPackage(name: string) {
+    const response = await this.client.post('/packages/install', { name });
+    return response.data;
+  }
+
 }
