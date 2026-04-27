@@ -9,6 +9,11 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { StellifyClient } from './stellify-client.js';
 import dotenv from 'dotenv';
+import { createRequire } from 'module';
+
+// Load the Stellify Framework manifest (generated from stellify-framework package)
+const require = createRequire(import.meta.url);
+const frameworkManifest = require('stellify-framework/framework-api.json');
 
 // Load environment variables
 dotenv.config();
@@ -28,63 +33,76 @@ const stellify = new StellifyClient({
 });
 
 // Define MCP tools
-// Stellify Framework API - full method reference for AI code generation
-const STELLIFY_FRAMEWORK_API = {
-  // Data & Forms
-  Form: ['create', 'set', 'get', 'getData', 'validate', 'isValid', 'getErrors', 'getError', 'reset', 'store', 'update', 'delete'],
-  Table: ['create', 'setData', 'addColumn', 'removeColumn', 'sort', 'filter', 'clearFilter', 'paginate', 'page', 'getData', 'getAllData', 'getColumns', 'getColumn', 'getTotalRows', 'getTotalPages', 'getCurrentPage', 'getPageSize', 'getSortKey', 'getSortDirection'],
-  Collection: ['create', 'collect', 'from', 'range', 'add', 'remove', 'removeWhere', 'set', 'get', 'first', 'last', 'sort', 'sortBy', 'reverse', 'filter', 'find', 'findIndex', 'map', 'reduce', 'forEach', 'includes', 'indexOf', 'every', 'some', 'slice', 'take', 'skip', 'chunk', 'unique', 'uniqueBy', 'groupBy', 'flatten', 'concat', 'isEmpty', 'isNotEmpty', 'count', 'clear', 'toArray', 'toJSON', 'clone', 'sum', 'avg', 'min', 'max'],
-  Tree: ['create', 'setRoot', 'addChild', 'removeNode', 'getNode', 'getRoot', 'getChildren', 'getParent', 'getSiblings', 'getAncestors', 'getDescendants', 'getDepth', 'getPath', 'traverse', 'find', 'findAll', 'move', 'toArray', 'size'],
-  // Network
-  Http: ['create', 'get', 'post', 'put', 'patch', 'delete', 'items', 'withHeaders', 'withToken', 'withTimeout'],
-  Socket: ['create', 'connect', 'disconnect', 'send', 'sendEvent', 'on', 'off', 'once', 'isConnected', 'getState'],
-  Auth: ['create', 'login', 'logout', 'fetchUser', 'getUser', 'getToken', 'isAuthenticated', 'setToken', 'setUser', 'refresh', 'onAuthChange', 'offAuthChange', 'getAuthHeader'],
-  Stream: ['create', 'headers', 'withToken', 'onChunk', 'onComplete', 'onError', 'get', 'post', 'abort', 'getBuffer', 'getChunks', 'isStreaming', 'clear'],
-  // Graphics & Visualization
-  Svg: ['create', 'select', 'find', 'attr', 'attrs', 'getAttr', 'addClass', 'removeClass', 'text', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'textElement', 'group', 'clear', 'remove', 'toString', 'toElement', 'getWidth', 'getHeight'],
-  Canvas: ['create', 'fromElement', 'fromSelector', 'size', 'getWidth', 'getHeight', 'style', 'save', 'restore', 'clear', 'fill', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'arc', 'path', 'text', 'measureText', 'drawImage', 'translate', 'rotate', 'scale', 'resetTransform', 'getPixel', 'setPixel', 'getImageData', 'putImageData', 'toDataURL', 'toBlob', 'getElement', 'getContext', 'appendTo'],
-  Graph: ['create', 'size', 'addNode', 'removeNode', 'addEdge', 'removeEdge', 'getNode', 'getNodes', 'getEdges', 'getEdgesWithPositions', 'getNeighbors', 'layout'],
-  Scale: ['linear', 'log', 'time', 'band', 'domain', 'range', 'getDomain', 'getRange', 'value', 'invert', 'ticks', 'clamp', 'padding', 'bandwidth'],
-  Axis: ['create', 'orientation', 'ticks', 'tickFormat', 'tickSize', 'getTicks', 'getOrientation', 'getTickSize', 'getRange', 'isHorizontal', 'isVertical'],
-  Motion: ['tween', 'spring', 'easing', 'onUpdate', 'onComplete', 'start', 'stop', 'isRunning', 'valueAt'],
-  // Platform APIs
-  Router: ['create', 'register', 'navigate', 'back', 'forward', 'getParams', 'getQuery', 'getCurrent', 'getState', 'onNavigate', 'offNavigate', 'start'],
-  Storage: ['local', 'session', 'set', 'get', 'remove', 'clear', 'has', 'keys', 'getAll', 'size'],
-  Events: ['create', 'on', 'off', 'once', 'emit', 'clear', 'listenerCount', 'eventNames'],
-  Clipboard: ['copy', 'paste', 'copyImage', 'copyHtml', 'isSupported', 'isWriteSupported'],
-  Notify: ['request', 'send', 'getPermission', 'isSupported', 'isGranted', 'isDenied'],
-  Geo: ['getPosition', 'watchPosition', 'stopWatching', 'stopAllWatching', 'isSupported', 'distance'],
-  Media: ['selectFile', 'selectFiles', 'capture', 'getMetadata', 'resize', 'toBase64', 'toArrayBuffer', 'toText', 'formatSize', 'isImage', 'isVideo', 'isAudio'],
-  DB: ['create', 'store', 'open', 'close', 'put', 'add', 'get', 'getAll', 'find', 'delete', 'clear', 'count', 'keys', 'update', 'batch', 'deleteDatabase', 'databases'],
-  Worker: ['create', 'fromFunction', 'fromCode', 'run', 'post', 'onMessage', 'onError', 'terminate', 'isRunning', 'getPendingCount'],
-  WorkerPool: ['create', 'fromFunction', 'run', 'map', 'terminate', 'getSize', 'getActiveCount', 'getQueueLength'],
-  // AI & Language
-  Speech: ['create', 'isSupported', 'listen', 'stopListening', 'onResult', 'onInterim', 'onEnd', 'onError', 'speak', 'stopSpeaking', 'pause', 'resume', 'getVoices', 'getVoicesByLanguage', 'isSpeaking', 'isListening'],
-  Chat: ['create', 'fromHistory', 'addMessage', 'addUser', 'addAssistant', 'addSystem', 'getMessage', 'getHistory', 'getMessages', 'getLastMessage', 'getLastUserMessage', 'getLastAssistantMessage', 'updateMessage', 'removeMessage', 'clear', 'clearAll', 'fork', 'truncate', 'count', 'countTokensEstimate', 'toJSON'],
-  Embed: ['create', 'store', 'storeMany', 'get', 'remove', 'clear', 'count', 'compare', 'nearest', 'search', 'cosineSimilarity', 'euclideanDistance', 'dotProduct', 'normalize', 'average', 'toJSON', 'fromJSON'],
-  Diff: ['chars', 'words', 'lines', 'apply', 'createPatch', 'distance', 'similarity', 'commonPrefix', 'commonSuffix'],
-  // Utilities
-  Time: ['now', 'create', 'parse', 'format', 'toISO', 'toDate', 'toTimestamp', 'toUnix', 'add', 'subtract', 'diff', 'isBefore', 'isAfter', 'isSame', 'isBetween', 'startOf', 'endOf', 'year', 'month', 'day', 'weekday', 'hour', 'minute', 'second', 'relative', 'clone'],
-  // Vue Composables
-  useStellify: ['(generic adapter for any module)'],
-  useForm: ['bind', 'state', 'set', 'get', 'getData', 'validate', 'isValid', 'getErrors', 'getError', 'reset', 'store', 'update', 'delete'],
-  useTable: ['state', 'setData', 'addColumn', 'removeColumn', 'sort', 'filter', 'clearFilter', 'paginate', 'page'],
-  useInfiniteScroll: ['items (Collection)', 'loading', 'hasMore', 'error', 'page', 'total', 'loadMore', 'reset', 'refresh', 'sentinelRef'],
-  useLiveData: ['data (Collection)', 'loading', 'error', 'connected', 'refresh', 'disconnect', 'reconnect', 'push', 'remove', 'update'],
-  useQueryState: ['(reactive refs per param)', 'getAll', 'setAll', 'reset', 'getUrl'],
-  useLazyLoad: ['data', 'visible', 'loading', 'loaded', 'error', 'targetRef', 'load', 'reset'],
-};
+// Stellify Framework API - dynamically loaded from stellify-framework manifest
+// The manifest is auto-generated by the stellify-framework build process
+
+interface FrameworkManifest {
+  version: string;
+  generatedAt: string;
+  composables: Record<string, {
+    summary: string;
+    options: Array<{ name: string; type: string; required: boolean; description?: string }>;
+    returns: Array<{ name: string; type: string; description?: string }>;
+  }>;
+  utilities: Record<string, {
+    summary: string;
+    methods: Array<{ name: string; signature: string; description?: string }>;
+    staticMethods?: Array<{ name: string; signature: string; description?: string }>;
+  }>;
+  rules: Array<{ name: string; signature: string; description?: string }>;
+}
+
+// Get the full framework API from the manifest
+function getFrameworkAPI(moduleName?: string): any {
+  const manifest = frameworkManifest as FrameworkManifest;
+
+  if (moduleName) {
+    // Check composables first (useX pattern)
+    if (manifest.composables[moduleName]) {
+      return { [moduleName]: manifest.composables[moduleName] };
+    }
+    // Check utilities
+    if (manifest.utilities[moduleName]) {
+      return { [moduleName]: manifest.utilities[moduleName] };
+    }
+    // Check rules
+    if (moduleName === 'rules') {
+      return { rules: manifest.rules };
+    }
+
+    // Not found
+    const available = [
+      ...Object.keys(manifest.composables),
+      ...Object.keys(manifest.utilities),
+      'rules'
+    ].join(', ');
+    return { error: `Module "${moduleName}" not found. Available: ${available}` };
+  }
+
+  // Return full API with manifest metadata
+  return {
+    version: manifest.version,
+    generatedAt: manifest.generatedAt,
+    composables: manifest.composables,
+    utilities: manifest.utilities,
+    rules: manifest.rules,
+  };
+}
 
 const tools: Tool[] = [
   {
     name: 'get_stellify_framework_api',
-    description: `Get Stellify Framework API reference. Import from "stellify-framework" (not @stellify/core). Collection is iterable with v-for.`,
+    description: `Get Stellify Framework API reference with full type signatures. Import from "stellify-framework".
+
+Returns composables (useForm, useAuth, etc.) with options/returns, utilities (Http, Collection, etc.) with methods/staticMethods, and validation rules.
+
+Each item includes summary, type signatures, and JSDoc descriptions. Collection is iterable with v-for.`,
     inputSchema: {
       type: 'object',
       properties: {
         module: {
           type: 'string',
-          description: 'Optional: specific module to get API for (e.g., "Form", "Http"). Omit to get all modules.',
+          description: 'Optional: specific module to get API for (e.g., "useForm", "Http", "rules"). Omit to get full API.',
         },
       },
     },
@@ -1404,6 +1422,27 @@ Changes are EPHEMERAL (not saved). For persistent changes, use update_element or
     },
   },
   {
+    name: 'install_package',
+    description: `Install a foundation package into the current project. Creates routes and other resources defined in the package manifest.
+
+Returns success with installed counts, or error with code:
+- PACKAGE_NOT_FOUND: Package name doesn't exist
+- PACKAGE_NOT_INSTALLABLE: Package is disabled
+- ALREADY_INSTALLED: Package routes already exist in project
+- UNKNOWN_MANIFEST_KEY: Package requires newer platform version
+- INSTALL_FAILED: Transaction failed`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Package name (e.g., "file-uploads")',
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
     name: 'analyze_performance',
     description: `Analyze execution performance from logs. Types: full, slow_methods, high_query_methods, high_memory_methods, failure_rates, trend.`,
     inputSchema: {
@@ -1655,18 +1694,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case 'get_stellify_framework_api': {
         const moduleName = args.module as string | undefined;
-        let result: any;
-
-        if (moduleName) {
-          const moduleApi = (STELLIFY_FRAMEWORK_API as any)[moduleName];
-          if (moduleApi) {
-            result = { [moduleName]: moduleApi };
-          } else {
-            result = { error: `Module "${moduleName}" not found. Available: ${Object.keys(STELLIFY_FRAMEWORK_API).join(', ')}` };
-          }
-        } else {
-          result = STELLIFY_FRAMEWORK_API;
-        }
+        const result = getFrameworkAPI(moduleName);
 
         return {
           content: [
@@ -2396,6 +2424,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 message: `Capability request logged: "${(args as any).capability}"`,
                 request_id: result.data?.uuid || result.uuid,
                 data: result.data || result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'install_package': {
+        const result = await stellify.installPackage((args as any).name);
+        if (result.status === 'error') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(result, null, 2),
+              },
+            ],
+          };
+        }
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                status: 'success',
+                message: `Package "${result.package}" v${result.version} installed successfully`,
+                installed: result.installed,
               }, null, 2),
             },
           ],
