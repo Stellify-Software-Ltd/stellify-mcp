@@ -326,9 +326,18 @@ export class StellifyClient {
     return response.data;
   }
 
-  // Framework capabilities - list what's available
-  async getCapabilities() {
-    const response = await this.client.get('/capabilities');
+  // Capabilities catalog - list libraries/services that can be enabled for the project.
+  // Returns the global catalog with each capability's type (npm/composer), packages,
+  // config requirements, and whether it's currently enabled for the active project.
+  async listCapabilities(params: { category?: string; type?: 'npm' | 'composer' } = {}) {
+    const response = await this.client.get('/capabilities', { params });
+    return response.data;
+  }
+
+  // Enable or disable a capability for the active project. Enabling adds it to the
+  // project so its packages are emitted into composer.json/package.json at build/export.
+  async setCapability(name: string, status: 'available' | 'not_available') {
+    const response = await this.client.put(`/capabilities/${name}`, { status });
     return response.data;
   }
 
@@ -407,26 +416,6 @@ export class StellifyClient {
 
   async deleteSetting(name: string) {
     const response = await this.client.delete(`/config/${name}`);
-    return response.data;
-  }
-
-  // UI Pattern checklists - best practices for common UI patterns
-  async getPattern(name: string) {
-    const response = await this.client.get(`/pattern/${name}`);
-    return response.data;
-  }
-
-  async savePattern(name: string, data: {
-    description: string;
-    checklist: string[];
-    example?: string;
-  }) {
-    const response = await this.client.put(`/pattern/${name}`, data);
-    return response.data;
-  }
-
-  async listPatterns() {
-    const response = await this.client.get('/pattern');
     return response.data;
   }
 

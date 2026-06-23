@@ -570,6 +570,10 @@ Route params like {id} auto-inject into controller method parameters when names 
           type: 'string',
           description: 'Optional module name to group this route with related code (e.g., "blog-posts", "user-auth"). Module is auto-created if it doesn\'t exist.',
         },
+        file: {
+          type: 'string',
+          description: 'UUID of the routes file (e.g., web.php) to register this route in. The route will be added to the file\'s data array.',
+        },
       },
       required: ['project_id', 'name', 'path', 'method'],
     },
@@ -697,7 +701,10 @@ Use the returned UUID with html_to_elements (page parameter) or get_route for fu
   },
   {
     name: 'create_element',
-    description: `Create a UI element. Provide page (route UUID) for root elements, or parent (element UUID) for children.`,
+    description: `Create a UI element. Provide page (route UUID) for root elements, or parent (element UUID) for children.
+
+**s-slot elements (for layouts):**
+Use type='s-slot' to create a slot placeholder in a layout. When a page uses the layout via \`<x-layout-name>\`, the page's children are injected where the s-slot is. Set 'name' property on the s-slot for named slots (default slot has name='default').`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -705,7 +712,7 @@ Use the returned UUID with html_to_elements (page parameter) or get_route for fu
           type: 'string',
           enum: [
             's-wrapper', 's-input', 's-form', 's-svg', 's-shape', 's-media',
-            's-freestyle', 's-directive'
+            's-freestyle', 's-directive', 's-slot'
           ],
           description: 'Element type - must be one of the valid Stellify element types',
         },
@@ -724,6 +731,12 @@ Use the returned UUID with html_to_elements (page parameter) or get_route for fu
   {
     name: 'update_element',
     description: `Update a UI element. Data object: tag, classes, text, event handlers (method UUIDs), classBindings. Set 'name' on root elements to create Blade views (e.g., name="notes.index" for view('notes.index')).
+
+**For s-slot elements (layout placeholders):**
+Set 'name' to define the slot name (e.g., name="header"). Default slot uses name="default".
+
+**For elements targeting named slots:**
+Set 'slot' property to specify which slot the element should be injected into (e.g., slot="header").
 
 **For elements inside @foreach loops (SSR/Blade):**
 Use these attributes to reference the loop variable (defaults to \`$item\`):
@@ -1443,6 +1456,58 @@ Returns success with installed counts, or error with code:
     },
   },
   {
+    name: 'list_capabilities',
+    description: `List the capability catalog - libraries and services that can be enabled for the project (e.g. Sanctum, Livewire, Vue, Stripe).
+
+Each capability includes:
+- name, category, description
+- type: "composer" (PHP) or "npm" (JavaScript) - determines whether it lands in composer.json or package.json
+- packages: the actual dependencies added when enabled (e.g. { "laravel/sanctum": "^4.0" })
+- config_keys: required configuration. If non-empty, the capability needs those settings (e.g. API keys via save_setting) BEFORE it can be enabled
+- enabled: whether it is currently active for this project
+
+Use this before set_capability to find the correct capability name and check its requirements.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        category: {
+          type: 'string',
+          description: 'Optional: filter to a single category (e.g., "auth", "payments", "frontend").',
+        },
+        type: {
+          type: 'string',
+          enum: ['npm', 'composer'],
+          description: 'Optional: filter by dependency type. "composer" for PHP packages, "npm" for JavaScript packages.',
+        },
+      },
+    },
+  },
+  {
+    name: 'set_capability',
+    description: `Enable or disable a capability (library/service) for the current project.
+
+Enabling adds the capability to the project so its packages are emitted into composer.json / package.json at build/export time (and may enable related framework features, e.g. Livewire directives).
+
+IMPORTANT:
+- Use list_capabilities first to get the exact capability name and check config_keys.
+- Capabilities that require configuration (non-empty config_keys, e.g. Stripe/S3 secrets) CANNOT be enabled until those settings are saved (via save_setting). Attempting to enable one returns an error.
+- This does not install code/routes - for foundation packages that scaffold routes, use install_package instead.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Capability name from list_capabilities (e.g., "sanctum", "livewire", "vue").',
+        },
+        enabled: {
+          type: 'boolean',
+          description: 'true to enable the capability for the project, false to disable it.',
+        },
+      },
+      required: ['name', 'enabled'],
+    },
+  },
+  {
     name: 'analyze_performance',
     description: `Analyze execution performance from logs. Types: full, slow_methods, high_query_methods, high_memory_methods, failure_rates, trend.`,
     inputSchema: {
@@ -1533,71 +1598,6 @@ This removes the "vote" setting profile entirely.`,
     },
   },
   {
-    name: 'get_pattern',
-    description: `Get a UI pattern checklist (accordion, modal, tabs, dropdown, toast). Returns best practices and common pitfalls.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Pattern name (e.g., "accordion", "modal", "tabs", "dropdown", "toast")',
-        },
-      },
-      required: ['name'],
-    },
-  },
-  {
-    name: 'save_pattern',
-    description: `Save or update a UI pattern checklist.
-
-Use this to add new patterns or update existing ones based on lessons learned.
-
-EXAMPLE:
-{
-  "name": "accordion",
-  "description": "Collapsible content panels",
-  "checklist": [
-    "Use v-show for visibility toggle",
-    "Store open state as boolean"
-  ],
-  "example": "const panels = ref([...]);"
-}`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Pattern name (e.g., "accordion", "modal")',
-        },
-        description: {
-          type: 'string',
-          description: 'Brief description of the pattern',
-        },
-        checklist: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Array of checklist items - best practices and things to remember',
-        },
-        example: {
-          type: 'string',
-          description: 'Optional code example',
-        },
-      },
-      required: ['name', 'description', 'checklist'],
-    },
-  },
-  {
-    name: 'list_patterns',
-    description: `List all available UI pattern checklists.
-
-Returns an array of pattern names and descriptions.
-Use this to discover what patterns are available before building UI components.`,
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  {
     name: 'get_assembled_code',
     description: `Get the assembled source code for a file. Returns the actual Vue SFC or PHP class as it would be rendered.
 
@@ -1651,14 +1651,13 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 
 ## Workflow for Vue Components (client-side interactivity)
 1. Research: Call get_project to understand current structure
-2. **Call \`get_stellify_framework_api\`** to check for composables before writing custom code
-3. Create file: \`create_file\` with type='js', extension='vue'
-4. Create methods: \`create_method\` (with body parameter)
-5. Create state: \`create_statement_with_code\` for refs/reactive
-6. Create template: \`html_to_elements\` WITHOUT \`page\` parameter (returns UUIDs)
-7. **Handle mount file**: Check \`appJs\` in create_file response. If \`action_required\` exists, ask user about mount file
-8. Finalize: \`save_file\` with template/data/statements arrays (include frameworkImports for composables)
-9. Verify: Call \`get_assembled_code\` to check the output
+2. Create file: \`create_file\` with type='js', extension='vue'
+3. Create methods: \`create_method\` (with body parameter)
+4. Create state: \`create_statement_with_code\` for refs/reactive
+5. Create template: \`html_to_elements\` WITHOUT \`page\` parameter (returns UUIDs)
+6. **Handle mount file**: Check \`appJs\` in create_file response. If \`action_required\` exists, ask user about mount file
+7. Finalize: \`save_file\` with template/data/statements arrays (include frameworkImports for composables)
+8. Verify: Call \`get_assembled_code\` to check the output
 `;
 
 // Legacy detailed instructions preserved as comments for reference if needed
@@ -1667,7 +1666,7 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 const server = new Server(
   {
     name: 'stellify-mcp',
-    version: '0.1.43',
+    version: '0.1.44',
   },
   {
     capabilities: {
@@ -2456,6 +2455,42 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      case 'list_capabilities': {
+        const result = await stellify.listCapabilities(args as any);
+        const data = result.data || result;
+        const count = Array.isArray(data) ? data.length : (data.capabilities?.length ?? 0);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Found ${count} capabilities`,
+                capabilities: data,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'set_capability': {
+        const { name: capName, enabled } = args as { name: string; enabled: boolean };
+        const status = enabled ? 'available' : 'not_available';
+        const result = await stellify.setCapability(capName, status);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Capability "${capName}" ${enabled ? 'enabled' : 'disabled'} for the project`,
+                capability: result.data || result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
       case 'analyze_performance': {
         const result = await stellify.analyzePerformance(args as any);
         const data = result.data || result;
@@ -2579,57 +2614,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               text: JSON.stringify({
                 success: true,
                 message: `Deleted setting "${(args as any).name}"`,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'get_pattern': {
-        const result = await stellify.getPattern((args as any).name);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                pattern: result.data || result,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'save_pattern': {
-        const { name, description, checklist, example } = args as {
-          name: string;
-          description: string;
-          checklist: string[];
-          example?: string;
-        };
-        await stellify.savePattern(name, { description, checklist, example });
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                message: `Saved pattern "${name}" with ${checklist.length} checklist items`,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'list_patterns': {
-        const result = await stellify.listPatterns();
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: true,
-                patterns: result.data || result,
               }, null, 2),
             },
           ],
