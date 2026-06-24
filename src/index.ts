@@ -2054,7 +2054,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'update_element': {
-        const { uuid, data } = args as any;
+        const { uuid } = args as any;
+        // Accept `data` (canonical) or `attributes` (common mistake) so a wrong key
+        // can never silently no-op. Reject an empty payload outright.
+        const data = (args as any).data ?? (args as any).attributes;
+        if (!data || typeof data !== 'object' || Array.isArray(data) || Object.keys(data).length === 0) {
+          throw new Error(
+            "update_element requires a non-empty 'data' object (HTML attributes, classes, text, or event handlers like {\"@click\": \"send\"})."
+          );
+        }
         const result = await stellify.updateElement(uuid, data);
         return {
           content: [
@@ -2740,6 +2748,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // Include the original message if different from backend message
     if (backendData?.message && error.message && !error.message.includes(backendData.message)) {
       errorResponse.details = { message: backendData.message };
+    }
+
+    // Surface the backend's detailed error (exception message / SQLSTATE) when it
+    // differs from the top-level message. Controllers return this in `error`, but it
+    // was previously dropped — leaving only a generic "Failed to ..." string.
+    if (backendData?.error && backendData.error !== errorResponse.error) {
+      errorResponse.details = { ...(errorResponse.details ?? {}), error: backendData.error };
     }
 
     return {
