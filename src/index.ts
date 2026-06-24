@@ -1404,6 +1404,47 @@ Changes are EPHEMERAL (not saved). For persistent changes, use update_element or
     },
   },
   {
+    name: 'run_migration',
+    description: `Apply a migration against the project's tenant database (creates/updates tables). Migrations need elevated Schema/DDL privileges that run_code forbids, so they have a dedicated runner. Pass the migration file UUID (returned by create_resources). Run this after create_resources to actually create the tables.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          description: 'UUID of the migration file to apply (its up() method runs against the tenant DB)',
+        },
+      },
+      required: ['file'],
+    },
+  },
+  {
+    name: 'publish',
+    description: `Bundle a Vue component tree into an ESM loader served at /esm and attach its import-map to a page route, so the component renders in the browser without the editor. Pass the entry file UUID (the app.js mount file) and the route UUID of the page that hosts it. Run this after building a Vue component + its app.js mount and wiring a page route, to make the component actually render.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the entry file (the app.js mount file that imports/mounts the component)',
+        },
+        route: {
+          type: 'string',
+          description: 'UUID of the page route that hosts the component (the import-map/loader is attached to it)',
+        },
+        filename: {
+          type: 'string',
+          description: 'Bundle filename slug (lowercase, digits, hyphens). Defaults to the entry file name.',
+        },
+        mode: {
+          type: 'string',
+          enum: ['bundle', 'esm'],
+          description: 'Bundle mode (default: bundle). "esm" emits a vue3-sfc-loader loader with an esm.sh import-map.',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
     name: 'request_capability',
     description: `Log a missing framework-level capability. Creates a ticket in the Stellify backlog.`,
     inputSchema: {
@@ -2406,6 +2447,38 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 error: result.error,
                 execution_time: result.execution_time,
                 memory_usage: result.memory_usage,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'run_migration': {
+        const result = await stellify.runMigration((args as any).file);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: result.status === 200 || result.success !== false,
+                message: result.message || 'Migration executed',
+                data: result.data ?? result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'publish': {
+        const result = await stellify.publish(args as any);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: result.success !== false,
+                message: result.message || 'Bundle published',
+                data: result.data ?? result,
               }, null, 2),
             },
           ],

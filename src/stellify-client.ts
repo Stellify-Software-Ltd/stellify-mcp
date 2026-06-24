@@ -326,6 +326,32 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Apply a migration against the project's tenant database (creates/updates tables).
+  // Migrations need elevated Schema/DDL privileges that the sandboxed run_code path
+  // forbids, so they run through their own endpoint.
+  async runMigration(file: string) {
+    if (!file) {
+      throw new Error('A migration file UUID is required');
+    }
+    const response = await this.client.post(`/code/run-migration/${file}`);
+    return response.data;
+  }
+
+  // Publish (bundle) a Vue component tree into an ESM loader served at /esm and attach
+  // its import-map to the page route, so the component renders without the editor.
+  async publish(params: {
+    uuid: string;
+    route?: string;
+    filename?: string;
+    mode?: 'bundle' | 'esm';
+  }) {
+    if (!params.uuid) {
+      throw new Error('An entry file UUID (the app.js mount file) is required to publish');
+    }
+    const response = await this.client.post('/publish', params);
+    return response.data;
+  }
+
   // Capabilities catalog - list libraries/services that can be enabled for the project.
   // Returns the global catalog with each capability's type (npm/composer), packages,
   // config requirements, and whether it's currently enabled for the active project.
