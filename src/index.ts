@@ -10,6 +10,9 @@ import {
 import { StellifyClient } from './stellify-client.js';
 import dotenv from 'dotenv';
 import { createRequire } from 'module';
+import { appendFileSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
 
 // Load the Stellify Framework manifest (generated from stellify-framework package)
 const require = createRequire(import.meta.url);
@@ -119,8 +122,8 @@ Each item includes summary, type signatures, and JSDoc descriptions. Collection 
     name: 'create_file',
     description: `Create an empty file shell in a Stellify project. Returns file UUID.
 
-For PHP: type='class', 'model', 'controller', or 'middleware'.
-For Vue: type='js', extension='vue'. Auto-creates app.js and template route.
+For PHP: type='class', 'model', 'controller', or 'middleware'. CONSTRAINT: API controllers must \`return response()->json(...)\` — a bare array/string leaves the response null and the API route 404s.
+For Vue: type='js', extension='vue'. Auto-creates app.js and template route. CONSTRAINT: Vue components must use native \`fetch\` with an \`X-XSRF-TOKEN\` header — the framework \`Http\` helper is not resolvable in the published bundle.
 
 Pass 'includes' array for framework class dependencies (auto-resolved to UUIDs). Use 'models' array in save_file for project models.
 
@@ -852,6 +855,8 @@ Note: To reorder elements, use update_element to modify the parent element's 'da
     name: 'html_to_elements',
     description: `Convert HTML to Stellify elements.
 
+**CONSTRAINTS (these bite silently):** Drops @event handlers (@click, @keyup.enter, …) on creation — set them AFTER with update_element (data:{"@click":"send"}). Mangles non-ASCII (£→Â£, em-dash→â) via DOMDocument — set such text via update_element (writes text directly) or use ASCII.
+
 **IMPORTANT - Choose the right approach:**
 
 **For SSR/Blade Pages (WordPress imports, static content, layouts):**
@@ -1275,7 +1280,7 @@ Changes are EPHEMERAL (not saved). For persistent changes, use update_element or
   },
   {
     name: 'create_resources',
-    description: `Scaffold Model, Controller, Service, and Migration. Routes are NOT auto-wired - use create_route after.`,
+    description: `Scaffold a CRUD resource in ONE call: Model + Migration (+ Controller, + optional Service, + optional route files) from fields + relationships. PREFER THIS over hand-building with create_file/create_method/create_migration for any data-backed feature. After it returns: call run_migration with the migration UUID to actually create the tables, then create_route/save_route to wire controller methods to executable routes (resource methods are not auto-wired).`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1374,7 +1379,7 @@ Changes are EPHEMERAL (not saved). For persistent changes, use update_element or
   },
   {
     name: 'run_code',
-    description: `Execute a method in sandboxed environment. Requires file and method UUIDs. Returns output, success, error, and optional benchmark data.`,
+    description: `Execute a method in sandboxed environment. Requires file and method UUIDs. Returns output, success, error, and optional benchmark data. CONSTRAINT: the sandbox blocks literal http://|https:// strings (exfiltration guard) — build any URL (success_url, redirects, webhooks) with the url('/path') helper, never a literal scheme string.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1667,6 +1672,10 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 
 - Files are stored as json. The json has a data key that references its methods (using uuids), and each method has a data key that references statements, and each statement has a data key that references clauses.
 
+## Fast path
+- For any data-backed feature, prefer \`create_resources\` (scaffolds Model + Migration + Controller + optional Service/routes in one call), then \`run_migration\`. Drop to granular create_file/create_method only for bespoke files.
+- Each tool's description carries its own constraints/gotchas — read it before first use rather than learning by failure.
+
 ## Choosing Between SSR Pages and Vue Components
 
 **Use SSR/Blade Pages (routes + elements) when:**
@@ -1703,6 +1712,22 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 
 // Legacy detailed instructions preserved as comments for reference if needed
 
+// --- Lightweight per-call payload telemetry ---------------------------------
+// Records request/response byte sizes per tool call to a JSONL file. Byte size
+// is the proxy for the agent's token cost of that call's content (~bytes/4);
+// the surgical-edit payload vs the whole-file baseline is what backs the
+// "fraction of the tokens" claim. Never allowed to break a tool call.
+const TELEMETRY_PATH =
+  process.env.STELLIFY_MCP_TELEMETRY_PATH || join(homedir(), '.stellify-mcp-telemetry.jsonl');
+
+function recordTelemetry(entry: Record<string, unknown>): void {
+  try {
+    appendFileSync(TELEMETRY_PATH, JSON.stringify(entry) + '\n');
+  } catch {
+    // telemetry is best-effort; swallow all errors
+  }
+}
+
 // Create MCP server
 const server = new Server(
   {
@@ -1723,7 +1748,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 // Handle tool execution
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+async function handleCallTool(request: any) {
   const { name, arguments: args } = request.params;
 
   if (!args) {
@@ -2439,22 +2464,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'run_code': {
         const result = await stellify.runCode(args as any);
-        const benchmarkInfo = (args as any).benchmark
-          ? ` (${result.execution_time || 'N/A'}ms, ${result.memory_usage || 'N/A'})`
+        // The backend envelope is { status, message, data, errors, benchmark? }.
+        // The method's return value (e.g. response()->json payload) is under `data`,
+        // NOT `output`; execution errors are under `errors`; timing under `benchmark`.
+        const ok = result.success !== false && (result.status === undefined || result.status === 200);
+        const benchmark = result.benchmark;
+        const benchmarkInfo = (args as any).benchmark && benchmark
+          ? ` (${benchmark.execution_time_ms ?? benchmark.duration_ms ?? 'N/A'}ms, ${benchmark.peak_memory ?? benchmark.memory ?? 'N/A'})`
           : '';
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify({
-                success: result.success !== false,
-                message: result.success !== false
+                success: ok,
+                message: ok
                   ? `Code executed successfully${benchmarkInfo}`
-                  : `Execution failed: ${result.error || 'Unknown error'}`,
-                output: result.output,
-                error: result.error,
-                execution_time: result.execution_time,
-                memory_usage: result.memory_usage,
+                  : `Execution failed: ${result.message || result.error || 'Unknown error'}`,
+                output: result.data ?? result.output,
+                errors: result.errors,
+                benchmark,
               }, null, 2),
             },
           ],
@@ -2766,6 +2795,42 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       ],
       isError: true,
     };
+  }
+}
+
+// Wrap tool execution with best-effort payload telemetry.
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const toolName = request.params?.name ?? 'unknown';
+  let reqBytes = 0;
+  try {
+    reqBytes = JSON.stringify(request.params ?? {}).length;
+  } catch {
+    // ignore
+  }
+  const startedAt = Date.now();
+  let result: any;
+  let threw = false;
+  try {
+    result = await handleCallTool(request);
+    return result;
+  } catch (e) {
+    threw = true;
+    throw e;
+  } finally {
+    let resBytes = 0;
+    try {
+      resBytes = JSON.stringify(result ?? {}).length;
+    } catch {
+      // ignore
+    }
+    recordTelemetry({
+      ts: new Date().toISOString(),
+      tool: toolName,
+      reqBytes,
+      resBytes,
+      ms: Date.now() - startedAt,
+      isError: threw || result?.isError === true,
+    });
   }
 });
 
