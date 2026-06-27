@@ -1378,6 +1378,69 @@ Changes are EPHEMERAL (not saved). For persistent changes, use update_element or
     },
   },
   {
+    name: 'search_code',
+    description: `Search the reusable-code library for an existing, proven unit that matches a requirement, ranked by fit. This is the RETRIEVE-don't-regenerate path: before scaffolding a feature from scratch with create_resources/create_file, search here first — a matching unit can be cloned in one call with reuse_code.
+
+Returns COMPACT candidates only (uuid, capability summary, facets, similarity, fit score + reason) — never code. Inspect the winner with get_file/get_method before cloning.
+
+CRITICAL — pin down requirements BEFORE searching. A vague query returns vague matches. If the user says "a login form", first establish the specifics that change which unit fits: SSO or password? which OAuth providers (Google/GitHub/…)? password reset, remember-me, MFA? Then encode the hard, non-negotiable constraints as 'required_facets' (a candidate is dropped unless it has ALL of them) and put the full natural-language requirement in 'query' (the semantic + rerank layers use it for nuance).
+
+Facet keys you can require: providers (oauth provider tokens e.g. google, github, azure), packages (e.g. laravel/socialite, laravel/cashier, laravel/sanctum), framework_features (authentication, password, mfa, validation, mail, authorization, …), tables, methods, routes.
+
+Typical flow: elicit specifics → search_code(query, required_facets) → get_file on the top candidate to verify it truly fits → reuse_code(files:[uuid]) → wire/adapt.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The full natural-language requirement, as specific as possible (e.g. "user login page with Google and GitHub SSO, password reset, redirects to dashboard"). Drives semantic recall and fit reranking.',
+        },
+        required_facets: {
+          type: 'object',
+          description: 'Hard constraints — a candidate is excluded unless it has ALL listed values for each key. Each value is an array of strings. Example: { "providers": ["google", "github"], "packages": ["laravel/socialite"] }. Keys: providers, packages, framework_features, tables, methods, routes. Omit or leave empty for soft/exploratory searches.',
+          additionalProperties: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+        },
+        limit: {
+          type: 'number',
+          description: 'Max candidates to return (default 10, max 25).',
+        },
+        project_id: {
+          type: 'string',
+          description: 'Optional: restrict the search to units from a specific source project/library.',
+        },
+        rerank: {
+          type: 'boolean',
+          description: 'Apply the LLM fit-rerank pass (default true). Set false for a pure semantic+facet result.',
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'reuse_code',
+    description: `Clone a reusable unit's ENTIRE dependency closure (file → methods → statements → clauses + attributes + referenced project files; route → elements) from its source project into your ACTIVE project, with fresh UUIDs and every internal reference rewritten. The cloned files are grafted into the right directories by type. This is how you RETRIEVE proven code instead of regenerating it — pair it with search_code.
+
+Pass the uuids returned by search_code (verify fit with get_file first). The source project is resolved automatically from the seeds and is never modified. Returns the new file/route uuids and clone counts. After cloning, wire/adapt as needed (e.g. register routes, rename a resource) and run_migration for any cloned migrations.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        files: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'UUIDs of files to reuse (controller/model/migration/service/…). Their closures are cloned.',
+        },
+        routes: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'UUIDs of routes/pages to reuse. Their element trees are cloned.',
+        },
+      },
+    },
+  },
+  {
     name: 'run_code',
     description: `Execute a method in sandboxed environment. Requires file and method UUIDs. Returns output, success, error, and optional benchmark data. CONSTRAINT: the sandbox blocks literal http://|https:// strings (exfiltration guard) — build any URL (success_url, redirects, webhooks) with the url('/path') helper, never a literal scheme string.`,
     inputSchema: {
@@ -2404,6 +2467,47 @@ async function handleCallTool(request: any) {
                 success: true,
                 message: `Broadcast ${(args as any).action} command${(args as any).element ? ` for element ${(args as any).element}` : ''}`,
                 data: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'search_code': {
+        const result = await stellify.searchCode(args as any);
+        const candidates = result.data || [];
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: result.message,
+                count: candidates.length,
+                candidates,
+                next_step: candidates.length
+                  ? 'Verify the top candidate with get_file, then clone it with reuse_code(files:[uuid]).'
+                  : 'No match. Refine the query/required_facets, or scaffold from scratch with create_resources.',
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'reuse_code': {
+        const result = await stellify.reuseCode(args as any);
+        const data = result.data || result;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: result.status ? result.status < 400 : true,
+                message: result.message,
+                source_project: data.source_project,
+                cloned: data.cloned,
+                files: data.files,
+                routes: data.routes,
               }, null, 2),
             },
           ],

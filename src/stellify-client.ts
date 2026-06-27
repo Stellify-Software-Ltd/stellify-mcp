@@ -310,6 +310,25 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Semantic + facet search over the reusable-code index. Returns compact candidates
+  // (summary + facets + fit score), never code.
+  async searchCode(params: {
+    query: string;
+    required_facets?: Record<string, string[]>;
+    limit?: number;
+    project_id?: string;
+    rerank?: boolean;
+  }) {
+    const response = await this.client.post('/reuse/search', params);
+    return response.data;
+  }
+
+  // Clone a matched unit's dependency closure into the active project.
+  async reuseCode(params: { files?: string[]; routes?: string[] }) {
+    const response = await this.client.post('/reuse', params);
+    return response.data;
+  }
+
   // Code execution - runs a specific method by file and method UUID
   async runCode(params: {
     file: string;
