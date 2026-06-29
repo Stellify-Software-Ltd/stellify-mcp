@@ -254,19 +254,7 @@ Pass 'includes' array for framework class dependencies (auto-resolved to UUIDs).
   },
   {
     name: 'add_method_body',
-    description: `Append code to an existing method. Use this when you need to ADD MORE code to a method that already has statements.
-
-**For new methods:** Use \`create_method\` with the \`body\` parameter instead - it creates the method with code in one call.
-
-**Nested code is handled correctly.** The parser tracks brace/bracket/paren depth and only splits on semicolons at the top level. Arrow functions with block bodies, computed properties, and other nested constructs work as single statements.
-
-Pass 'types' to specify TypeScript types for variables declared in the code.
-
-IMPORTANT: This APPENDS to existing method statements. To REPLACE a method's code entirely:
-1. Create a NEW method with create_method (with body parameter)
-2. Update the file's 'data' array to include new method UUID (remove old one)
-3. Update any element click handlers to reference the new method UUID
-4. Delete the old method with delete_method`,
+    description: `APPEND code to an existing method that already has statements. (For a new method, use create_method with its 'body' param instead — one call.) Nested code is handled: the parser tracks brace/bracket/paren depth and only splits semicolons at top level, so arrow functions, computed properties etc. stay as single statements. Pass 'types' for TS variable types. To REPLACE a method's code entirely: create a new method (with body), swap its UUID into the file's 'data' array and any element click handlers, then delete_method the old one.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -392,21 +380,7 @@ For significant changes, include context fields: summary, rationale, references,
   },
   {
     name: 'search_attributes',
-    description: `Search for available PHP 8 attributes in Laravel. Returns attribute suggestions with descriptions, namespaces, targets (class/method/property/parameter), and expected arguments.
-
-Use this before adding attributes to files or methods to find the correct attribute name and syntax.
-
-**Three modes of operation:**
-
-1. **List categories** (no params): Returns all available attribute categories
-   - Call with no arguments to discover categories like "eloquent", "queue", "routing"
-
-2. **List category attributes** (category only): Returns all attributes in a category
-   - Example: category="eloquent" → returns Fillable, Hidden, ObservedBy, etc.
-
-3. **Search by query** (query provided): Searches attribute names
-   - Example: query="fill" → finds Fillable attribute
-   - Can combine with category to search within a specific category`,
+    description: `Find available PHP 8 attributes in Laravel (name, namespace, target, expected args) before adding them to files/methods. Three modes: no params → list categories (eloquent, queue, routing, …); category only → all attributes in it (e.g. eloquent → Fillable, Hidden, …); query → search names (e.g. "fill" → Fillable), optionally scoped by category.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -428,29 +402,7 @@ Use this before adding attributes to files or methods to find the correct attrib
   },
   {
     name: 'analyze_attributes',
-    description: `Analyze PHP 8 attribute usage across a Stellify project. Useful for auditing, finding missing attributes, and searching attribute values.
-
-**Three modes:**
-
-1. **usage** (default): List all attributes used in the project with counts
-   - Optional: file_type to filter (e.g., "model", "controller")
-   - Returns: attribute names, counts, and files using each
-
-2. **missing**: Find files of a specific type missing a required attribute
-   - Required: file_type (e.g., "model", "class")
-   - Required: attribute name (e.g., "Fillable", "FailOnUnknownFields")
-   - Returns: files missing vs having the attribute
-
-3. **search**: Find files where an attribute contains a specific value
-   - Required: attribute name
-   - Optional: value to search for in attribute args
-   - Optional: file_type to filter
-   - Returns: matching files with their attribute values
-
-Example queries:
-- "Find every FormRequest missing FailOnUnknownFields": mode=missing, file_type=class, attribute=FailOnUnknownFields
-- "Find models where 'email' is fillable": mode=search, attribute=Fillable, value=email
-- "List all attributes used": mode=usage`,
+    description: `Audit PHP 8 attribute usage across a project. Three modes: usage (default) → all attributes used + counts (optional file_type filter); missing → files of a file_type lacking a required attribute (e.g. FormRequests missing FailOnUnknownFields); search → files where an attribute contains a value (e.g. models where Fillable contains 'email', optional file_type).`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -733,38 +685,14 @@ Use type='s-slot' to create a slot placeholder in a layout. When a page uses the
   },
   {
     name: 'update_element',
-    description: `Update a UI element. Data object: tag, classes, text, event handlers (method UUIDs), classBindings. Set 'name' on root elements to create Blade views (e.g., name="notes.index" for view('notes.index')).
+    description: `Update a UI element. Data object: tag, classes, text, event handlers (method UUIDs), classBindings. Set 'name' on root elements to create Blade views (e.g. name="notes.index" → view('notes.index')).
 
-**For s-slot elements (layout placeholders):**
-Set 'name' to define the slot name (e.g., name="header"). Default slot uses name="default".
+Slots: set 'name' on an s-slot to define a slot (name="default" is the default); set 'slot' on an element to inject it into a named slot.
 
-**For elements targeting named slots:**
-Set 'slot' property to specify which slot the element should be injected into (e.g., slot="header").
-
-**For elements inside @foreach loops (SSR/Blade):**
-Use these attributes to reference the loop variable (defaults to \`$item\`):
-- \`textField\`: Field name for text content → outputs \`{{ $item->fieldName }}\`
-- \`hrefField\`: Field name for href → outputs \`href="{{ $item->fieldName }}"\` (field value ONLY, no prefix)
-- \`srcField\`: Field name for src → outputs \`src="{{ $item->fieldName }}"\`
-
-**For hrefs with path prefixes (IMPORTANT):**
-\`hrefField\` outputs ONLY the field value. There is NO \`hrefPrefix\` attribute.
-For links like \`/post/slug-here\`, you MUST use \`hrefExpression\`:
-- \`hrefExpression: "/post/{{ $item->slug }}"\` → outputs \`href="/post/{{ $item->slug }}"\`
-- \`hrefExpression: "/category/{{ $item->slug }}"\` → outputs \`href="/category/{{ $item->slug }}"\`
-
-**For complex Blade expressions in attributes:**
-Use expression attributes when you need more than simple field access:
-- \`hrefExpression\`: Blade expression for href → outputs \`href="..."\` with the expression
-- \`srcExpression\`: Blade expression for src → outputs \`src="..."\` with the expression
-- \`altExpression\`: Blade expression for alt → outputs \`alt="..."\` with the expression
-
-Examples:
-- Path prefix: \`hrefExpression: "/post/{{ $item->slug }}"\`
-- Route helper: \`hrefExpression: "{{ route('posts.show', $item->slug) }}"\`
-
-**For Blade text content:**
-Use the \`statements\` array with statement UUIDs containing Blade code. The statement's \`code\` property will be output directly for Blade to evaluate.`,
+Inside @foreach loops (SSR/Blade, loop var defaults to $item):
+- textField/hrefField/srcField → simple field access, e.g. textField:"title" outputs \`{{ $item->title }}\` (field value ONLY, no prefix).
+- For prefixed/complex paths use hrefExpression/srcExpression/altExpression, e.g. hrefExpression:"/post/{{ $item->slug }}" or "{{ route('posts.show', $item->slug) }}". (There is NO hrefPrefix.)
+- For Blade text content, pass the statements[] array with statement UUIDs whose code is output for Blade to evaluate.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -855,55 +783,11 @@ Note: To reorder elements, use update_element to modify the parent element's 'da
     name: 'html_to_elements',
     description: `Convert HTML to Stellify elements.
 
-**CONSTRAINTS (these bite silently):** Drops @event handlers (@click, @keyup.enter, …) on creation — set them AFTER with update_element (data:{"@click":"send"}). Mangles non-ASCII (£→Â£, em-dash→â) via DOMDocument — set such text via update_element (writes text directly) or use ASCII.
+SILENT GOTCHAS: @event handlers (@click, @keyup.enter, …) are dropped on creation — set them AFTER with update_element (data:{"@click":"send"}). Non-ASCII is mangled via DOMDocument — set such text with update_element or use ASCII; prefer SVG over emoji.
 
-**IMPORTANT - Choose the right approach:**
+Placement: pass 'page' (route UUID) for SSR/Blade pages — elements attach to the route (the common case); pass 'selection' (element UUID) to nest under an existing element; omit both for standalone Vue elements (use the returned UUIDs in save_file's template array). Multiple root elements: only the FIRST attaches to a route — make one call per root element, or wrap them in a single container div.
 
-**For SSR/Blade Pages (WordPress imports, static content, layouts):**
-- MUST pass 'page' (route UUID) - elements attach to the route for server-side rendering
-- This is the most common use case
-
-**For Vue Components (client-side interactivity):**
-- Omit 'page' - elements are standalone, referenced by file's template array
-- Returns UUIDs to use in save_file's template array
-
-**Where elements go:**
-- Pass 'page' (route UUID): Elements attached to the route for SSR rendering
-- Pass 'selection' (element UUID): Elements attached as children of existing element
-- Omit both: Elements are standalone (Vue components only) - use returned UUIDs in save_file's template array
-
-**⚠️ CRITICAL: Multiple Root Elements Limitation**
-When HTML contains multiple root-level elements (e.g., <header>, <main>, <footer>), only the FIRST root element gets attached to the route. Other elements become orphaned!
-
-**WRONG:** \`html_to_elements(page: routeUUID, elements: "<header>...</header><main>...</main><footer>...</footer>")\`
-→ Only <header> attaches to route. <main> and <footer> are orphaned!
-
-**CORRECT:** Make separate calls for each root element:
-1. \`html_to_elements(page: routeUUID, elements: "<header>...</header>")\`
-2. \`html_to_elements(page: routeUUID, elements: "<main>...</main>")\`
-3. \`html_to_elements(page: routeUUID, elements: "<footer>...</footer>")\`
-
-**OR** wrap all elements in a single container div.
-
-**@click auto-wiring:** Pass 'file' UUID to auto-resolve @click="methodName" handlers. Methods must exist in the file first.
-
-**Blade Syntax Handling:**
-For SSR/Blade pages, do NOT pass raw Blade expressions in text or attributes. The HTML parser stores them literally which causes rendering issues. Instead:
-
-1. **For static HTML:** Pass clean HTML without Blade syntax, then use \`update_element\` to add dynamic behavior
-2. **For loop content:** After creating elements, use \`update_element\` with:
-   - \`textField\`, \`hrefField\`, \`srcField\` for simple field access (outputs \`{{ $item->field }}\`)
-   - \`hrefExpression\`, \`srcExpression\`, \`altExpression\` for paths with prefixes or complex expressions
-   - \`statements\` array with statement UUIDs for text content with Blade code
-3. **For conditionals:** Use \`s-directive\` elements as siblings (see update_element docs)
-
-**IMPORTANT - Links with path prefixes:**
-\`hrefField\` outputs ONLY the field value with no prefix. There is NO \`hrefPrefix\` attribute.
-For links like \`/post/my-slug\`, use \`hrefExpression: "/post/{{ $item->slug }}"\` instead.
-
-**Loop variable:** Inside \`@foreach\` loops created with \`s-directive\`, the default loop variable is \`$item\`. Use \`textField: "title"\` to output \`{{ $item->title }}\`.
-
-Prefer SVG icons over emoji (encoding issues).`,
+@click auto-wiring: pass 'file' to resolve @click="methodName" (methods must exist first). Do NOT pass raw Blade in text/attributes (stored literally) — create clean elements, then add dynamic behaviour with update_element (textField/hrefField for \`{{ $item->field }}\`, hrefExpression for prefixed paths, statements[] for Blade code, s-directive siblings for loops/conditionals; default loop var is $item).`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1708,13 +1592,9 @@ This removes the "vote" setting profile entirely.`,
   },
   {
     name: 'get_assembled_code',
-    description: `Get the assembled source code for a file. Returns the actual Vue SFC or PHP class as it would be rendered.
+    description: `Get the assembled source code for a file — the full Vue SFC or PHP class as it would render. This returns the WHOLE file, so it is expensive; use it sparingly.
 
-Use this after save_file to verify the component was built correctly:
-- Check that all methods are included
-- Verify @click handlers are wired to methods
-- Confirm imports and reactive state are present
-- Spot any missing pieces before deployment`,
+Do NOT call this to "check" after each edit. Every create_*/save_* operation is validated server-side, so a successful call already means the edit is structurally sound — re-assembling after each one re-reads the entire file and defeats the point of surgical editing. Build optimistically, then assemble ONCE at the end as a final sanity check (and run migrations/tests then). Only reach for it mid-build to diagnose a specific reported failure.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1738,6 +1618,7 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 ## Fast path
 - **MANDATORY FIRST STEP — reuse before you build.** Before ANY \`create_resources\`/\`create_file\`/\`create_method\` for a new feature, you MUST call \`search_code\` first. This is NOT optional and applies *even when the feature is small, fully specified, or the project is empty* — "it's quick to just build it" is exactly the wrong instinct, because cloning an existing unit with \`reuse_code\` costs a fraction of regenerating it (that is the whole point of this platform). Verify the top match with \`get_file\`/\`get_method\`, then \`reuse_code\` it (clones its whole closure) and adapt the result (rename, swap fields). You may scaffold from scratch ONLY after \`search_code\` has returned nothing usable.
 - When nothing reusable exists, for a data-backed feature use \`create_resources\` (scaffolds Model + Migration + Controller + optional Service/routes in one call), then \`run_migration\`. Drop to granular create_file/create_method only for bespoke files.
+- **Build optimistically; verify once at the end.** Every create_*/save_* operation is validated server-side — a successful call means the edit is structurally sound, so TRUST it and keep moving. Do NOT call \`get_assembled_code\` to "check" after each step: it re-reads the whole file and throws away the token advantage of surgical editing. Assemble ONCE at the very end as a final sanity check, and run migrations/tests then. Treat verification (assemble + test) as a distinct closing step, not a per-edit habit.
 - Each tool's description carries its own constraints/gotchas — read it before first use rather than learning by failure.
 
 ## Choosing Between SSR Pages and Vue Components
