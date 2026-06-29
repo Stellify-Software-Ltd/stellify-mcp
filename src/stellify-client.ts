@@ -147,6 +147,11 @@ export class StellifyClient {
     return response.data;
   }
 
+  async replaceMethodBody(method: string, params: { file: string; body: string }) {
+    const response = await this.client.put(`/method/${method}/body`, params);
+    return response.data;
+  }
+
   async deleteMethod(file: string, method: string) {
     const response = await this.client.delete(`/method/${file}/${method}`);
     return response.data;

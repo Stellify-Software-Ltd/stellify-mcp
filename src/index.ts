@@ -254,7 +254,7 @@ Pass 'includes' array for framework class dependencies (auto-resolved to UUIDs).
   },
   {
     name: 'add_method_body',
-    description: `APPEND code to an existing method that already has statements. (For a new method, use create_method with its 'body' param instead — one call.) Nested code is handled: the parser tracks brace/bracket/paren depth and only splits semicolons at top level, so arrow functions, computed properties etc. stay as single statements. Pass 'types' for TS variable types. To REPLACE a method's code entirely: create a new method (with body), swap its UUID into the file's 'data' array and any element click handlers, then delete_method the old one.`,
+    description: `APPEND code to the end of an existing method that already has statements. (For a NEW method use create_method with its 'body' param. To REPLACE / CHANGE what a method does, use replace_method_body — do NOT delete and recreate the method.) Nested code is handled: the parser tracks brace/bracket/paren depth and only splits semicolons at top level, so arrow functions, computed properties etc. stay as single statements. Pass 'types' for TS variable types.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -277,6 +277,28 @@ Pass 'includes' array for framework class dependencies (auto-resolved to UUIDs).
         },
       },
       required: ['file', 'method', 'code'],
+    },
+  },
+  {
+    name: 'replace_method_body',
+    description: `Replace what an existing method does — IN PLACE. Clears the method's current statements and re-parses your new code into fresh ones, KEEPING the method's UUID, name and parameters, so file.data, routes and click handlers stay wired. This is the surgical, cheap way to CHANGE a method: do NOT delete_method + create_method (that re-emits the whole method and forces you to re-wire references). Use this whenever you need to modify, fix, or rewrite a method's body.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          description: 'UUID of the file containing the method',
+        },
+        method: {
+          type: 'string',
+          description: 'UUID of the method whose body to replace',
+        },
+        body: {
+          type: 'string',
+          description: 'The new method body — just the statements, no function declaration. Example: "$q = Article::query(); if ($category) { $q->where(\'category\', $category); } return $q->latest()->paginate();"',
+        },
+      },
+      required: ['file', 'method', 'body'],
     },
   },
   {
@@ -1832,6 +1854,23 @@ async function handleCallTool(request: any) {
               text: JSON.stringify({
                 success: true,
                 message: 'Method body parsed and saved successfully',
+                data: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'replace_method_body': {
+        const { method, ...params } = args as any;
+        const result = await stellify.replaceMethodBody(method, params);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: 'Method body replaced in place (method UUID and wiring preserved)',
                 data: result,
               }, null, 2),
             },
