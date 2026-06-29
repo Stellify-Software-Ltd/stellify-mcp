@@ -1343,7 +1343,7 @@ Typical flow: elicit specifics → search_code(query, required_facets) → get_f
     name: 'reuse_code',
     description: `Clone a reusable unit's ENTIRE dependency closure (file → methods → statements → clauses + attributes + referenced project files; route → elements) from its source project into your ACTIVE project, with fresh UUIDs and every internal reference rewritten. The cloned files are grafted into the right directories by type. This is how you RETRIEVE proven code instead of regenerating it — pair it with search_code.
 
-Pass the uuids returned by search_code (verify fit with get_file first). The source project is resolved automatically from the seeds and is never modified. Returns the new file/route uuids and clone counts. After cloning, wire/adapt as needed (e.g. register routes, rename a resource) and run_migration for any cloned migrations.`,
+Pass the uuids returned by search_code. EFFICIENCY: trust a high-fit search result — do NOT get_file/get_method to "double-check" before cloning, and do NOT get_assembled_code to verify after; the clone is proven code. To turn the clone into a DIFFERENT resource (e.g. reuse a Bookmark CRUD as Article), pass 'rename' and the substitution is done server-side in this same call — no manual renaming, no inspection needed. Supply ALL needed variants (singular/plural/case) as from→to pairs. The source project is never modified. Returns the new file/route uuids + clone counts; after cloning just wire routes and run_migration for any cloned migrations.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1356,6 +1356,11 @@ Pass the uuids returned by search_code (verify fit with get_file first). The sou
           type: 'array',
           items: { type: 'string' },
           description: 'UUIDs of routes/pages to reuse. Their element trees are cloned.',
+        },
+        rename: {
+          type: 'object',
+          additionalProperties: { type: 'string' },
+          description: 'Optional from→to string substitutions applied to the clone server-side, reshaping it into a different resource. Include every case/number variant, e.g. { "Bookmark": "Article", "bookmark": "article", "bookmarks": "articles", "url": "slug" }.',
         },
       },
     },

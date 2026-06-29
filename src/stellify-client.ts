@@ -328,8 +328,9 @@ export class StellifyClient {
     return response.data;
   }
 
-  // Clone a matched unit's dependency closure into the active project.
-  async reuseCode(params: { files?: string[]; routes?: string[] }) {
+  // Clone a matched unit's dependency closure into the active project, optionally
+  // renaming it into a different resource in the same pass.
+  async reuseCode(params: { files?: string[]; routes?: string[]; rename?: Record<string, string> }) {
     const response = await this.client.post('/reuse', params);
     return response.data;
   }
