@@ -1027,7 +1027,21 @@ Required: uuid, name, type. For significant changes, include context fields: sum
         attributes: {
           type: 'array',
           items: { type: 'string' },
-          description: 'PHP 8 class-level attributes (e.g., ["Fillable([\'name\', \'email\'])"], ["ObservedBy(UserObserver::class)"]). Use search_attributes tool to find available attributes.',
+          description: 'PHP 8 class-level attributes (e.g., ["ObservedBy(UserObserver::class)"]). Use search_attributes tool to find available attributes. NOTE: a model\'s mass-assignable columns are NOT set here — use the dedicated "fillable" param below, which drives the emitted protected $fillable property.',
+        },
+        fillable: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Model only: mass-assignable column names, rendered as protected $fillable = [...]. Pass the COMPLETE list (full replacement) — e.g. to add "tags" send ["title","body","author","tags"], not just ["tags"]. Omit to leave the existing $fillable untouched.',
+        },
+        casts: {
+          type: 'object',
+          additionalProperties: { type: 'string' },
+          description: 'Model only: attribute cast map rendered as protected $casts = [...], keyed by column name (e.g. {"published_at":"datetime","price":"decimal:2","status":"App\\\\Enums\\\\Status"}). Full replacement; omit to leave existing casts untouched.',
+        },
+        soft_deletes: {
+          type: 'boolean',
+          description: 'Model only: whether the model uses the SoftDeletes trait. Omit to leave unchanged.',
         },
       },
       required: ['uuid', 'name', 'type'],
@@ -1592,9 +1606,9 @@ This removes the "vote" setting profile entirely.`,
   },
   {
     name: 'get_assembled_code',
-    description: `Get the assembled source code for a file — the full Vue SFC or PHP class as it would render. This returns the WHOLE file, so it is expensive; use it sparingly.
+    description: `Get the assembled source code for a file — the full PHP class or Vue SFC as it would render. Returns the WHOLE file, so it is the single biggest source of wasted tokens when overused.
 
-Do NOT call this to "check" after each edit. Every create_*/save_* operation is validated server-side, so a successful call already means the edit is structurally sound — re-assembling after each one re-reads the entire file and defeats the point of surgical editing. Build optimistically, then assemble ONCE at the end as a final sanity check (and run migrations/tests then). Only reach for it mid-build to diagnose a specific reported failure.`,
+HARD RULE: do NOT call this during a build. Call it AT MOST ONCE, at the very end, as a final sanity check. Every create_*/save_* operation is validated server-side — a successful call means your edit is correct by construction, so you do NOT need to assemble the file to confirm it "took". The urge to "just check the result" after each edit is exactly the wrong instinct: it re-reads the entire file every time and throws away the token advantage of surgical editing. Trust your edits, keep moving, assemble once at the end. (Only exception: diagnosing a SPECIFIC failure the app actually reported.)`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1618,7 +1632,7 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 ## Fast path
 - **MANDATORY FIRST STEP — reuse before you build.** Before ANY \`create_resources\`/\`create_file\`/\`create_method\` for a new feature, you MUST call \`search_code\` first. This is NOT optional and applies *even when the feature is small, fully specified, or the project is empty* — "it's quick to just build it" is exactly the wrong instinct, because cloning an existing unit with \`reuse_code\` costs a fraction of regenerating it (that is the whole point of this platform). Verify the top match with \`get_file\`/\`get_method\`, then \`reuse_code\` it (clones its whole closure) and adapt the result (rename, swap fields). You may scaffold from scratch ONLY after \`search_code\` has returned nothing usable.
 - When nothing reusable exists, for a data-backed feature use \`create_resources\` (scaffolds Model + Migration + Controller + optional Service/routes in one call), then \`run_migration\`. Drop to granular create_file/create_method only for bespoke files.
-- **Build optimistically; verify once at the end.** Every create_*/save_* operation is validated server-side — a successful call means the edit is structurally sound, so TRUST it and keep moving. Do NOT call \`get_assembled_code\` to "check" after each step: it re-reads the whole file and throws away the token advantage of surgical editing. Assemble ONCE at the very end as a final sanity check, and run migrations/tests then. Treat verification (assemble + test) as a distinct closing step, not a per-edit habit.
+- **Build optimistically; do NOT re-read your work mid-build.** Every create_*/save_* is validated server-side, so a successful call means the edit is correct by construction — TRUST it and keep moving. HARD RULE: do not call \`get_assembled_code\` (or re-fetch whole files) to "check progress" during a build; that re-reads the entire file every time and is the #1 source of wasted tokens. Resisting the urge to verify each step is the single biggest efficiency win. Assemble exactly ONCE, at the very end, then run migrations/tests — verification is a distinct closing step, never a per-edit habit.
 - Each tool's description carries its own constraints/gotchas — read it before first use rather than learning by failure.
 
 ## Choosing Between SSR Pages and Vue Components
