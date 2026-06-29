@@ -1280,7 +1280,7 @@ Changes are EPHEMERAL (not saved). For persistent changes, use update_element or
   },
   {
     name: 'create_resources',
-    description: `Scaffold a CRUD resource in ONE call: Model + Migration (+ Controller, + optional Service, + optional route files) from fields + relationships. PREFER THIS over hand-building with create_file/create_method/create_migration for any data-backed feature. After it returns: call run_migration with the migration UUID to actually create the tables, then create_route/save_route to wire controller methods to executable routes (resource methods are not auto-wired).`,
+    description: `Scaffold a CRUD resource in ONE call: Model + Migration (+ Controller, + optional Service, + optional route files) from fields + relationships. MANDATORY: you MUST call search_code BEFORE this tool, every time — even for a small, fully-specified feature on an empty project ("it's quick to just build it" is the wrong instinct; cloning is far cheaper than regenerating). If any similar proven resource exists, reuse_code it and adapt (rename, swap fields) instead of scaffolding. Use create_resources ONLY after search_code has returned nothing usable; when you do, it's preferred over hand-building with create_file/create_method/create_migration. After it returns: call run_migration with the migration UUID to actually create the tables, then create_route/save_route to wire controller methods to executable routes (resource methods are not auto-wired).`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1736,7 +1736,8 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 - Files are stored as json. The json has a data key that references its methods (using uuids), and each method has a data key that references statements, and each statement has a data key that references clauses.
 
 ## Fast path
-- For any data-backed feature, prefer \`create_resources\` (scaffolds Model + Migration + Controller + optional Service/routes in one call), then \`run_migration\`. Drop to granular create_file/create_method only for bespoke files.
+- **MANDATORY FIRST STEP — reuse before you build.** Before ANY \`create_resources\`/\`create_file\`/\`create_method\` for a new feature, you MUST call \`search_code\` first. This is NOT optional and applies *even when the feature is small, fully specified, or the project is empty* — "it's quick to just build it" is exactly the wrong instinct, because cloning an existing unit with \`reuse_code\` costs a fraction of regenerating it (that is the whole point of this platform). Verify the top match with \`get_file\`/\`get_method\`, then \`reuse_code\` it (clones its whole closure) and adapt the result (rename, swap fields). You may scaffold from scratch ONLY after \`search_code\` has returned nothing usable.
+- When nothing reusable exists, for a data-backed feature use \`create_resources\` (scaffolds Model + Migration + Controller + optional Service/routes in one call), then \`run_migration\`. Drop to granular create_file/create_method only for bespoke files.
 - Each tool's description carries its own constraints/gotchas — read it before first use rather than learning by failure.
 
 ## Choosing Between SSR Pages and Vue Components
