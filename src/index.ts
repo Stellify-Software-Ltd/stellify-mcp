@@ -783,7 +783,7 @@ Note: To reorder elements, use update_element to modify the parent element's 'da
     name: 'html_to_elements',
     description: `Convert HTML to Stellify elements.
 
-SILENT GOTCHAS: @event handlers (@click, @keyup.enter, …) are dropped on creation — set them AFTER with update_element (data:{"@click":"send"}). Non-ASCII is mangled via DOMDocument — set such text with update_element or use ASCII; prefer SVG over emoji.
+SILENT GOTCHA: non-ASCII text is mangled by DOMDocument (£→Â£, em-dash→â) — use ASCII, prefer SVG over emoji, or set such text afterwards with update_element. (@event handlers like @click/@keyup.enter ARE captured on creation — you do NOT need to re-set them; pass 'file' to auto-resolve @click="methodName" to its method UUID.)
 
 Placement: pass 'page' (route UUID) for SSR/Blade pages — elements attach to the route (the common case); pass 'selection' (element UUID) to nest under an existing element; omit both for standalone Vue elements (use the returned UUIDs in save_file's template array). Multiple root elements: only the FIRST attaches to a route — make one call per root element, or wrap them in a single container div.
 
