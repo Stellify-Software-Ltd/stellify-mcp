@@ -94,6 +94,21 @@ function getFrameworkAPI(moduleName?: string): any {
 
 const tools: Tool[] = [
   {
+    name: 'load_tools',
+    description: `Enable a group of situational tools that are kept OUT of the default set to save context (they cost tokens on every turn). Call this ONCE with the group(s) you need and those tools become available to call. Groups: "frontend" (UI elements, Vue components, realtime broadcast, publish), "analysis" (code quality / performance / attribute audits), "capabilities" (enable libraries & packages, framework API reference), "settings" (setting profiles). You do NOT need this for normal backend building — the core create/edit/search/reuse/route/migration tools are always loaded.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        groups: {
+          type: 'array',
+          items: { type: 'string', enum: ['frontend', 'analysis', 'capabilities', 'settings'] },
+          description: 'The tool group(s) to enable.',
+        },
+      },
+      required: ['groups'],
+    },
+  },
+  {
     name: 'get_stellify_framework_api',
     description: `Get Stellify Framework API reference with full type signatures. Import from "stellify-framework".
 
@@ -1656,6 +1671,9 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 
 - Files are stored as json. The json has a data key that references its methods (using uuids), and each method has a data key that references statements, and each statement has a data key that references clauses.
 
+## Tools
+- The core create/edit/search/reuse/route/migration tools are always loaded. Situational tools are kept out of the default set to save context — if you need to work with UI elements or Vue (frontend), run code/attribute audits (analysis), enable libraries/packages (capabilities), or setting profiles (settings), call \`load_tools\` ONCE with the relevant group(s) and they become available.
+
 ## Fast path
 - **MANDATORY FIRST STEP — reuse before you build.** Before ANY \`create_resources\`/\`create_file\`/\`create_method\` for a new feature, you MUST call \`search_code\` first. This is NOT optional and applies *even when the feature is small, fully specified, or the project is empty* — "it's quick to just build it" is exactly the wrong instinct, because cloning an existing unit with \`reuse_code\` costs a fraction of regenerating it (that is the whole point of this platform). Verify the top match with \`get_file\`/\`get_method\`, then \`reuse_code\` it (clones its whole closure) and adapt the result (rename, swap fields). You may scaffold from scratch ONLY after \`search_code\` has returned nothing usable.
 - When nothing reusable exists, for a data-backed feature use \`create_resources\` (scaffolds Model + Migration + Controller + optional Service/routes in one call), then \`run_migration\`. Drop to granular create_file/create_method only for bespoke files.
@@ -1722,15 +1740,37 @@ const server = new Server(
   },
   {
     capabilities: {
-      tools: {},
+      tools: { listChanged: true },
     },
     instructions: SERVER_INSTRUCTIONS,
   }
 );
 
-// Handle tool list requests
+// --- Lazy-loaded tool groups -------------------------------------------------------------
+// Situational tools are kept OUT of the default tools/list so their schemas aren't re-sent in
+// the per-turn prompt payload (~4k tokens/turn saved). The agent calls `load_tools` to pull in
+// a group; we then emit tools/list_changed so the client re-fetches with the group included.
+const LAZY_GROUPS: Record<string, string[]> = {
+  frontend: ['html_to_elements', 'create_element', 'update_element', 'get_element', 'get_element_tree', 'delete_element', 'search_elements', 'broadcast_element_command', 'publish'],
+  analysis: ['analyze_attributes', 'search_attributes', 'analyze_performance', 'analyze_quality'],
+  capabilities: ['list_capabilities', 'set_capability', 'request_capability', 'install_package', 'get_stellify_framework_api'],
+  settings: ['save_setting', 'get_setting', 'delete_setting'],
+};
+const groupFor = (toolName: string): string | null => {
+  for (const [group, names] of Object.entries(LAZY_GROUPS)) {
+    if (names.includes(toolName)) return group;
+  }
+  return null;
+};
+const enabledGroups = new Set<string>();
+
+// Handle tool list requests — core tools always; a situational tool only once its group is loaded.
 server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return { tools };
+  const active = tools.filter((t) => {
+    const group = groupFor(t.name);
+    return group === null || enabledGroups.has(group);
+  });
+  return { tools: active };
 });
 
 // Handle tool execution
@@ -1743,6 +1783,35 @@ async function handleCallTool(request: any) {
 
   try {
     switch (name) {
+      case 'load_tools': {
+        const requested = (Array.isArray(args.groups) ? args.groups : []) as string[];
+        const enabled: string[] = [];
+        for (const group of requested) {
+          if (Object.prototype.hasOwnProperty.call(LAZY_GROUPS, group)) {
+            enabledGroups.add(group);
+            enabled.push(group);
+          }
+        }
+        // Tell the client the tool list changed so it re-fetches with the newly enabled tools.
+        try { await server.sendToolListChanged(); } catch { /* client may not support it */ }
+        const nowAvailable = enabled.flatMap((group) => LAZY_GROUPS[group]);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: enabled.length > 0,
+                enabled_groups: [...enabledGroups],
+                now_available: nowAvailable,
+                message: enabled.length > 0
+                  ? `Enabled ${enabled.join(', ')}. Now available: ${nowAvailable.join(', ')}.`
+                  : 'No known groups matched. Valid groups: frontend, analysis, capabilities, settings.',
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
       case 'get_stellify_framework_api': {
         const moduleName = args.module as string | undefined;
         const result = getFrameworkAPI(moduleName);
