@@ -95,7 +95,7 @@ function getFrameworkAPI(moduleName?: string): any {
 const tools: Tool[] = [
   {
     name: 'load_tools',
-    description: `Enable a group of situational tools that are kept OUT of the default set to save context (they cost tokens on every turn). Call this ONCE with the group(s) you need and those tools become available to call. Groups: "frontend" (UI elements, Vue components, realtime broadcast, publish), "analysis" (code quality / performance / attribute audits), "capabilities" (enable libraries & packages, framework API reference), "settings" (setting profiles). You do NOT need this for normal backend building — the core create/edit/search/reuse/route/migration tools are always loaded.`,
+    description: `Enable a group of situational tools that are kept OUT of the default set to save context (they cost tokens on every turn). Call this ONCE with the group(s) you need and those tools become available to call. Groups: "editing" (surgical statement-level edits + granular inspection: save_/create_method/create_statement/add_/replace_method_body/delete_/get_file/get_method — load this ONLY when you must hand-edit existing code or inspect a specific unit; the scaffold + reuse path does not need it), "frontend" (UI elements, Vue components, realtime broadcast, publish), "analysis" (code quality / performance / attribute audits), "capabilities" (enable libraries & packages, framework API reference), "settings" (setting profiles). The reuse-first core — create_resources, create_file, search_code, reuse_code, create_route/save_route, run_code, run_migration, get_assembled_code — is always loaded, so a normal scaffold/reuse build needs no load_tools call.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -362,6 +362,10 @@ For significant changes, include context fields: summary, rationale, references,
         is_async: {
           type: 'boolean',
           description: 'Whether the method is async (JavaScript/Vue only). Set to true for methods that use await.',
+        },
+        file: {
+          type: 'string',
+          description: 'UUID of the file that contains this method. Enables copy-on-write when editing a method inside referenced (reused) code — pass it whenever you know it, so the platform forks into your project instead of touching the shared original.',
         },
         summary: {
           type: 'string',
@@ -972,7 +976,7 @@ Examples:
   },
   {
     name: 'save_statement',
-    description: 'Update an existing statement. Use this to modify statement properties after creation.',
+    description: 'Update an existing statement. Use this to modify statement properties after creation. Always pass the containing method (and file, if known): when the statement lives in reused-by-reference code, this lets the platform fork just the edited statement into your project and leave the shared original untouched. Omitting them still works for statements your project already owns.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -983,6 +987,14 @@ Examples:
         data: {
           type: 'object',
           description: 'Statement data to update',
+        },
+        method: {
+          type: 'string',
+          description: 'UUID of the method that contains this statement. Enables copy-on-write when editing referenced (reused) code — pass it whenever you know it.',
+        },
+        file: {
+          type: 'string',
+          description: 'UUID of the file that contains the method. Optional extra ancestor context for copy-on-write.',
         },
       },
       required: ['uuid'],
@@ -1672,11 +1684,12 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 - Files are stored as json. The json has a data key that references its methods (using uuids), and each method has a data key that references statements, and each statement has a data key that references clauses.
 
 ## Tools
-- The core create/edit/search/reuse/route/migration tools are always loaded. Situational tools are kept out of the default set to save context — if you need to work with UI elements or Vue (frontend), run code/attribute audits (analysis), enable libraries/packages (capabilities), or setting profiles (settings), call \`load_tools\` ONCE with the relevant group(s) and they become available.
+- The reuse-first core is always loaded: \`create_resources\`, \`create_file\`, \`search_code\`/\`search_files\`/\`search_methods\`/\`search_routes\`, \`reuse_code\`, \`create_route\`/\`save_route\`, \`run_code\`, \`run_migration\`, \`get_assembled_code\`, \`get_project\`. A scaffold-or-reuse build needs nothing else.
+- Situational tools are kept out of the default set to save context; call \`load_tools\` ONCE with the group you need: **"editing"** — surgical statement-level edits + granular inspection (\`save_*\`, \`create_method\`, \`create_statement\`(\`_with_code\`), \`add_method_body\`, \`add_statement_code\`, \`replace_method_body\`, \`delete_*\`, \`get_file\`/\`get_method\`/\`get_statement\`/\`get_route\`); "frontend" (UI/Vue); "analysis" (audits); "capabilities" (libraries/packages); "settings". Load "editing" only when you must hand-edit existing code or inspect a specific unit.
 
 ## Fast path
-- **MANDATORY FIRST STEP — reuse before you build.** Before ANY \`create_resources\`/\`create_file\`/\`create_method\` for a new feature, you MUST call \`search_code\` first. This is NOT optional and applies *even when the feature is small, fully specified, or the project is empty* — "it's quick to just build it" is exactly the wrong instinct, because cloning an existing unit with \`reuse_code\` costs a fraction of regenerating it (that is the whole point of this platform). Verify the top match with \`get_file\`/\`get_method\`, then \`reuse_code\` it (clones its whole closure) and adapt the result (rename, swap fields). You may scaffold from scratch ONLY after \`search_code\` has returned nothing usable.
-- When nothing reusable exists, for a data-backed feature use \`create_resources\` (scaffolds Model + Migration + Controller + optional Service/routes in one call), then \`run_migration\`. Drop to granular create_file/create_method only for bespoke files.
+- **MANDATORY FIRST STEP — reuse before you build.** Before ANY \`create_resources\`/\`create_file\` for a new feature, you MUST call \`search_code\` first. This is NOT optional and applies *even when the feature is small, fully specified, or the project is empty* — "it's quick to just build it" is exactly the wrong instinct, because cloning an existing unit with \`reuse_code\` costs a fraction of regenerating it (that is the whole point of this platform). TRUST a high-fit match — do NOT \`get_file\`/\`get_method\` to double-check first — then \`reuse_code\` it (clones its whole closure, applying a \`rename\` map server-side to reshape it, e.g. Bookmark→Article). You may scaffold from scratch ONLY after \`search_code\` has returned nothing usable.
+- When nothing reusable exists, for a data-backed feature use \`create_resources\` (scaffolds Model + Migration + Controller + optional Service/routes in one call — and reuses a proven resource internally when one matches), then \`run_migration\`. Drop to bespoke files with \`create_file\` only when needed; for granular statement-level editing, \`load_tools\` the "editing" group first.
 - **Build optimistically; do NOT re-read your work mid-build.** Every create_*/save_* is validated server-side, so a successful call means the edit is correct by construction — TRUST it and keep moving. HARD RULE: do not call \`get_assembled_code\` (or re-fetch whole files) to "check progress" during a build; that re-reads the entire file every time and is the #1 source of wasted tokens. Resisting the urge to verify each step is the single biggest efficiency win. Assemble exactly ONCE, at the very end, then run migrations/tests — verification is a distinct closing step, never a per-edit habit.
 - Each tool's description carries its own constraints/gotchas — read it before first use rather than learning by failure.
 
@@ -1751,6 +1764,17 @@ const server = new Server(
 // the per-turn prompt payload (~4k tokens/turn saved). The agent calls `load_tools` to pull in
 // a group; we then emit tools/list_changed so the client re-fetches with the group included.
 const LAZY_GROUPS: Record<string, string[]> = {
+  // Surgical statement-level editing + granular inspection. The reuse-first/scaffold path
+  // (create_resources, reuse_code, run_migration, route wiring) never needs these, so they are
+  // deferred — ~3.9k tokens/turn off the default payload. Load only when hand-editing existing
+  // code or debugging a specific unit.
+  editing: [
+    'save_file', 'save_method', 'save_statement', 'save_directory',
+    'create_method', 'create_statement', 'create_statement_with_code', 'create_directory',
+    'add_method_body', 'add_statement_code', 'replace_method_body',
+    'delete_file', 'delete_method', 'delete_statement', 'delete_route',
+    'get_file', 'get_method', 'get_statement', 'get_route', 'get_directory',
+  ],
   frontend: ['html_to_elements', 'create_element', 'update_element', 'get_element', 'get_element_tree', 'delete_element', 'search_elements', 'broadcast_element_command', 'publish'],
   analysis: ['analyze_attributes', 'search_attributes', 'analyze_performance', 'analyze_quality'],
   capabilities: ['list_capabilities', 'set_capability', 'request_capability', 'install_package', 'get_stellify_framework_api'],
@@ -1805,7 +1829,7 @@ async function handleCallTool(request: any) {
                 now_available: nowAvailable,
                 message: enabled.length > 0
                   ? `Enabled ${enabled.join(', ')}. Now available: ${nowAvailable.join(', ')}.`
-                  : 'No known groups matched. Valid groups: frontend, analysis, capabilities, settings.',
+                  : 'No known groups matched. Valid groups: editing, frontend, analysis, capabilities, settings.',
               }, null, 2),
             },
           ],
