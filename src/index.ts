@@ -1227,7 +1227,7 @@ Changes are EPHEMERAL (not saved). For persistent changes, use update_element or
   },
   {
     name: 'create_resources',
-    description: `Scaffold a CRUD resource in ONE call: Model + Migration (+ Controller, + optional Service, + optional route files) from fields + relationships. MANDATORY: you MUST call search_code BEFORE this tool, every time — even for a small, fully-specified feature on an empty project ("it's quick to just build it" is the wrong instinct; cloning is far cheaper than regenerating). If any similar proven resource exists, reuse_code it and adapt (rename, swap fields) instead of scaffolding. Use create_resources ONLY after search_code has returned nothing usable; when you do, it's preferred over hand-building with create_file/create_method/create_migration. After it returns: call run_migration with the migration UUID to actually create the tables, then create_route/save_route to wire controller methods to executable routes (resource methods are not auto-wired).`,
+    description: `Scaffold a CRUD resource in ONE call: Model + Migration (+ Controller, + optional Service, + optional route files) from fields + relationships. MANDATORY: you MUST call search_code BEFORE this tool, every time — even for a small, fully-specified feature on an empty project ("it's quick to just build it" is the wrong instinct; cloning is far cheaper than regenerating). If any similar proven resource exists, reuse_code it (referenced in place) and adapt with the editing tools instead of scaffolding. Use create_resources ONLY after search_code has returned nothing usable; when you do, it's preferred over hand-building with create_file/create_method/create_migration. After it returns: call run_migration with the migration UUID to actually create the tables, then create_route/save_route to wire controller methods to executable routes (resource methods are not auto-wired).`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1334,7 +1334,7 @@ CRITICAL — pin down requirements BEFORE searching. A vague query returns vague
 
 Facet keys you can require: providers (oauth provider tokens e.g. google, github, azure), packages (e.g. laravel/socialite, laravel/cashier, laravel/sanctum), framework_features (authentication, password, mfa, validation, mail, authorization, …), tables, methods, routes.
 
-Typical flow: elicit specifics → search_code(query, required_facets) → get_file on the top candidate to verify it truly fits → reuse_code(files:[uuid]) → wire/adapt.`,
+Typical flow: elicit specifics → search_code(query, required_facets) → reuse_code(files:[top uuid]) → adapt with the editing tools if needed (edits fork automatically; the canonical stays untouched).`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1368,26 +1368,21 @@ Typical flow: elicit specifics → search_code(query, required_facets) → get_f
   },
   {
     name: 'reuse_code',
-    description: `Clone a reusable unit's ENTIRE dependency closure (file → methods → statements → clauses + attributes + referenced project files; route → elements) from its source project into your ACTIVE project, with fresh UUIDs and every internal reference rewritten. The cloned files are grafted into the right directories by type. This is how you RETRIEVE proven code instead of regenerating it — pair it with search_code.
+    description: `REFERENCE a reusable unit into your ACTIVE project — the canonical code is linked in place, never copied. Each reused file becomes a thin local shell whose methods resolve to the canonical originals at assembly time, so the code you get is byte-identical to the proven source and costs nothing to carry. This is how you RETRIEVE proven code instead of regenerating it — pair it with search_code.
 
-Pass the uuids returned by search_code. EFFICIENCY: trust a high-fit search result — do NOT get_file/get_method to "double-check" before cloning, and do NOT get_assembled_code to verify after; the clone is proven code. To turn the clone into a DIFFERENT resource (e.g. reuse a Bookmark CRUD as Article), pass 'rename' and the substitution is done server-side in this same call — no manual renaming, no inspection needed. Supply ALL needed variants (singular/plural/case) as from→to pairs. ROUTES ARE AUTOMATIC: cloning a controller auto-carries the routes that point at it (renamed + rewired to the clone) — you do NOT need to pass them in 'routes' or rebuild them with create_route afterwards. The source project is never modified. Returns the new file/route uuids + clone counts; after cloning just run_migration for any cloned migrations. So the whole reuse is ONE call: search_code → reuse_code(files, rename) → run_migration.`,
+Pass the uuids returned by search_code. EFFICIENCY: trust a high-fit search result — do NOT get_file/get_method to "double-check" before referencing, and do NOT get_assembled_code to verify after; the reference IS the proven code. References are VERBATIM by design: there is no rename step. To adapt the reused code (different names, fields, behaviour), just edit it afterwards with the normal editing tools — each edit forks only the touched code into your project automatically (copy-on-write), leaving the canonical unit and every other project referencing it untouched. ROUTES ARE AUTOMATIC: referencing a controller auto-carries the routes that point at it (rewired to your project) — you do NOT need to pass them in 'routes' or rebuild them with create_route afterwards. The source project is never modified. Returns the new file/route uuids + reference counts; then just run_migration for any carried migrations. So the whole reuse is ONE call: search_code → reuse_code(files) → run_migration.`,
     inputSchema: {
       type: 'object',
       properties: {
         files: {
           type: 'array',
           items: { type: 'string' },
-          description: 'UUIDs of files to reuse (controller/model/migration/service/…). Their closures are cloned.',
+          description: 'UUIDs of files to reuse (controller/model/migration/service/…). Their methods are referenced in place.',
         },
         routes: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Usually unnecessary — a controller\'s routes are auto-carried. Pass explicit route/page UUIDs only to reuse a standalone page (with its element tree) that isn\'t reached via a cloned controller.',
-        },
-        rename: {
-          type: 'object',
-          additionalProperties: { type: 'string' },
-          description: 'Optional from→to string substitutions applied to the clone server-side, reshaping it into a different resource. Include every case/number variant, e.g. { "Bookmark": "Article", "bookmark": "article", "bookmarks": "articles", "url": "slug" }.',
+          description: 'Usually unnecessary — a controller\'s routes are auto-carried. Pass explicit route/page UUIDs only to reuse a standalone page that isn\'t reached via a referenced controller.',
         },
       },
     },
@@ -1688,7 +1683,7 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 - Situational tools are kept out of the default set to save context; call \`load_tools\` ONCE with the group you need: **"editing"** — surgical statement-level edits + granular inspection (\`save_*\`, \`create_method\`, \`create_statement\`(\`_with_code\`), \`add_method_body\`, \`add_statement_code\`, \`replace_method_body\`, \`delete_*\`, \`get_file\`/\`get_method\`/\`get_statement\`/\`get_route\`); "frontend" (UI/Vue); "analysis" (audits); "capabilities" (libraries/packages); "settings". Load "editing" only when you must hand-edit existing code or inspect a specific unit.
 
 ## Fast path
-- **MANDATORY FIRST STEP — reuse before you build.** Before ANY \`create_resources\`/\`create_file\` for a new feature, you MUST call \`search_code\` first. This is NOT optional and applies *even when the feature is small, fully specified, or the project is empty* — "it's quick to just build it" is exactly the wrong instinct, because cloning an existing unit with \`reuse_code\` costs a fraction of regenerating it (that is the whole point of this platform). TRUST a high-fit match — do NOT \`get_file\`/\`get_method\` to double-check first — then \`reuse_code\` it (clones its whole closure, applying a \`rename\` map server-side to reshape it, e.g. Bookmark→Article). You may scaffold from scratch ONLY after \`search_code\` has returned nothing usable.
+- **MANDATORY FIRST STEP — reuse before you build.** Before ANY \`create_resources\`/\`create_file\` for a new feature, you MUST call \`search_code\` first. This is NOT optional and applies *even when the feature is small, fully specified, or the project is empty* — "it's quick to just build it" is exactly the wrong instinct, because cloning an existing unit with \`reuse_code\` costs a fraction of regenerating it (that is the whole point of this platform). TRUST a high-fit match — do NOT \`get_file\`/\`get_method\` to double-check first — then \`reuse_code\` it (the canonical unit is REFERENCED into your project in place, not copied; adapt it afterwards with the ordinary editing tools — edits fork only what they touch, via copy-on-write). You may scaffold from scratch ONLY after \`search_code\` has returned nothing usable.
 - When nothing reusable exists, for a data-backed feature use \`create_resources\` (scaffolds Model + Migration + Controller + optional Service/routes in one call — and reuses a proven resource internally when one matches), then \`run_migration\`. Drop to bespoke files with \`create_file\` only when needed; for granular statement-level editing, \`load_tools\` the "editing" group first.
 - **Build optimistically; do NOT re-read your work mid-build.** Every create_*/save_* is validated server-side, so a successful call means the edit is correct by construction — TRUST it and keep moving. HARD RULE: do not call \`get_assembled_code\` (or re-fetch whole files) to "check progress" during a build; that re-reads the entire file every time and is the #1 source of wasted tokens. Resisting the urge to verify each step is the single biggest efficiency win. Assemble exactly ONCE, at the very end, then run migrations/tests — verification is a distinct closing step, never a per-edit habit.
 - Each tool's description carries its own constraints/gotchas — read it before first use rather than learning by failure.
@@ -2519,7 +2514,7 @@ async function handleCallTool(request: any) {
                 count: candidates.length,
                 candidates,
                 next_step: candidates.length
-                  ? 'Verify the top candidate with get_file, then clone it with reuse_code(files:[uuid]).'
+                  ? 'Trust the top candidate and reference it with reuse_code(files:[uuid]) — no need to inspect it first; adapt afterwards with the editing tools if needed.'
                   : 'No match. Refine the query/required_facets, or scaffold from scratch with create_resources.',
               }, null, 2),
             },
