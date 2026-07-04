@@ -101,7 +101,7 @@ const tools: Tool[] = [
       properties: {
         groups: {
           type: 'array',
-          items: { type: 'string', enum: ['frontend', 'analysis', 'capabilities', 'settings'] },
+          items: { type: 'string', enum: ['editing', 'frontend', 'analysis', 'capabilities', 'settings'] },
           description: 'The tool group(s) to enable.',
         },
       },
