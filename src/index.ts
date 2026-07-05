@@ -296,7 +296,9 @@ Pass 'includes' array for framework class dependencies (auto-resolved to UUIDs).
   },
   {
     name: 'replace_method_body',
-    description: `Replace what an existing method does — IN PLACE. Clears the method's current statements and re-parses your new code into fresh ones, KEEPING the method's UUID, name and parameters, so file.data, routes and click handlers stay wired. This is the surgical, cheap way to CHANGE a method: do NOT delete_method + create_method (that re-emits the whole method and forces you to re-wire references). Use this whenever you need to modify, fix, or rewrite a method's body.`,
+    description: `Replace what an existing method does — IN PLACE. Clears the method's current statements and re-parses your new code into fresh ones, KEEPING the method's UUID, name and parameters, so file.data, routes and click handlers stay wired. This is the surgical, cheap way to CHANGE a method: do NOT delete_method + create_method (that re-emits the whole method and forces you to re-wire references). Use this whenever you need to modify, fix, or rewrite a method's body.
+
+Works on REFERENCED (reused) code too: pass your project's file uuid and either the canonical method uuid (what assembled views show) or the local placeholder uuid — the platform forks the method into your project via copy-on-write and edits the fork; the canonical original is never touched.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -986,7 +988,7 @@ Examples:
         },
         data: {
           type: 'object',
-          description: 'Statement data to update',
+          description: "Statement data to update. Pass the clause-token LIST as {data: ['p-1', '<clause-uuid>', ...]} — that list becomes the statement's tokens.",
         },
         method: {
           type: 'string',
