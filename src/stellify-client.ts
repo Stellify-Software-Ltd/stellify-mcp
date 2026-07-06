@@ -152,6 +152,11 @@ export class StellifyClient {
     return response.data;
   }
 
+  async renameVariable(method: string, params: { from: string; to: string }) {
+    const response = await this.client.put(`/method/${method}/variable`, params);
+    return response.data;
+  }
+
   async deleteMethod(file: string, method: string) {
     const response = await this.client.delete(`/method/${file}/${method}`);
     return response.data;
@@ -335,6 +340,13 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Curated fork variants of a canonical unit — the approved alternatives a developer
+  // can pick instead of the original (each with its note + adoption count).
+  async listForks(uuid: string) {
+    const response = await this.client.get(`/reuse/${uuid}/forks`);
+    return response.data;
+  }
+
   // Code execution - runs a specific method by file and method UUID
   async runCode(params: {
     file: string;
@@ -359,6 +371,16 @@ export class StellifyClient {
       throw new Error('A migration file UUID is required');
     }
     const response = await this.client.post(`/code/run-migration/${file}`);
+    return response.data;
+  }
+
+  // Run all tests in a studio test file. The backend wraps the run in a DB
+  // transaction and rolls back, so test runs never mutate project data.
+  async runTests(file: string) {
+    if (!file) {
+      throw new Error('A test file UUID is required');
+    }
+    const response = await this.client.put(`/test/${file}`);
     return response.data;
   }
 

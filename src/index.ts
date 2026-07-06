@@ -95,7 +95,7 @@ function getFrameworkAPI(moduleName?: string): any {
 const tools: Tool[] = [
   {
     name: 'load_tools',
-    description: `Enable a group of situational tools that are kept OUT of the default set to save context (they cost tokens on every turn). Call this ONCE with the group(s) you need and those tools become available to call. Groups: "editing" (surgical statement-level edits + granular inspection: save_/create_method/create_statement/add_/replace_method_body/delete_/get_file/get_method — load this ONLY when you must hand-edit existing code or inspect a specific unit; the scaffold + reuse path does not need it), "frontend" (UI elements, Vue components, realtime broadcast, publish), "analysis" (code quality / performance / attribute audits), "capabilities" (enable libraries & packages, framework API reference), "settings" (setting profiles). The reuse-first core — create_resources, create_file, search_code, reuse_code, create_route/save_route, run_code, run_migration, get_assembled_code — is always loaded, so a normal scaffold/reuse build needs no load_tools call.`,
+    description: `Enable a group of situational tools that are kept OUT of the default set to save context (they cost tokens on every turn). Call this ONCE with the group(s) you need and those tools become available to call. Groups: "editing" (surgical statement-level edits + granular inspection: save_/create_method/create_statement/add_/replace_method_body/delete_/get_file/get_method — load this ONLY when you must hand-edit existing code or inspect a specific unit; the scaffold + reuse path does not need it), "frontend" (UI elements, Vue components, realtime broadcast, publish), "analysis" (code quality / performance / attribute audits), "capabilities" (enable libraries & packages, framework API reference), "settings" (setting profiles). The reuse-first core — create_resources, create_file, search_code, reuse_code, create_route/save_route, run_code, run_migration, run_tests, get_assembled_code — is always loaded, so a normal scaffold/reuse build needs no load_tools call.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -316,6 +316,30 @@ Works on REFERENCED (reused) code too: pass your project's file uuid and either 
         },
       },
       required: ['file', 'method', 'body'],
+    },
+  },
+  {
+    name: 'rename_variable',
+    description: `Rename EVERY occurrence of a variable within one method, atomically. This is the safe way to rename: editing a single variable clause only changes that ONE occurrence (occurrences are independent references, like retyping one occurrence in a text editor), which leaves the others behind and breaks the code. Do NOT stitch a rename together with statement-by-statement edits — use this.
+
+Scoped to the method: other methods using the same variable name are untouched. Parameters are renamed too (keeping their type hints). Works on referenced (reused) code via copy-on-write. Returns counts and warnings — a warning means the variable also appears interpolated inside a string, which is NOT renamed; fix those with replace_method_body or save_clause.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        method: {
+          type: 'string',
+          description: 'UUID of the method to rename the variable in',
+        },
+        from: {
+          type: 'string',
+          description: 'Current variable name, with or without the leading $ (e.g., "$user" or "user")',
+        },
+        to: {
+          type: 'string',
+          description: 'New variable name, with or without the leading $',
+        },
+      },
+      required: ['method', 'from', 'to'],
     },
   },
   {
@@ -1330,7 +1354,7 @@ Changes are EPHEMERAL (not saved). For persistent changes, use update_element or
     name: 'search_code',
     description: `Search the reusable-code library for an existing, proven unit that matches a requirement, ranked by fit. This is the RETRIEVE-don't-regenerate path: before scaffolding a feature from scratch with create_resources/create_file, search here first — a matching unit can be cloned in one call with reuse_code.
 
-Returns COMPACT candidates only (uuid, capability summary, facets, similarity, fit score + reason) — never code. Inspect the winner with get_file/get_method before cloning.
+Returns COMPACT candidates only (uuid, capability summary, facets, similarity, fit score + reason, and 'variants' — how many curated fork alternatives descend from it) — never code. Inspect the winner with get_file/get_method before cloning. When a candidate has variants > 0, call list_forks(uuid) to see the alternatives (each with the submitter's note + adoption count) and let the user pick which to reuse.
 
 CRITICAL — pin down requirements BEFORE searching. A vague query returns vague matches. If the user says "a login form", first establish the specifics that change which unit fits: SSO or password? which OAuth providers (Google/GitHub/…)? password reset, remember-me, MFA? Then encode the hard, non-negotiable constraints as 'required_facets' (a candidate is dropped unless it has ALL of them) and put the full natural-language requirement in 'query' (the semantic + rerank layers use it for nuance).
 
@@ -1390,6 +1414,20 @@ Pass the uuids returned by search_code. EFFICIENCY: trust a high-fit search resu
     },
   },
   {
+    name: 'list_forks',
+    description: `List the curated FORK VARIANTS of a canonical unit — approved forks that descend from it, ranked by adoption. When a search_code candidate reports variants > 0, call this with its uuid to see the alternatives: each carries a summary, the submitter's NOTE (their case for why this take is useful), and an adoption count (how many projects reference it). Present the options and let the user choose; reuse a chosen variant with reuse_code exactly like the canonical. A variant is byte-identical proven code just like any other referenced unit.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the canonical unit (a file or method) whose fork variants to list. Use the uuid of a search_code candidate that reported variants > 0.',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
     name: 'run_code',
     description: `Execute a method in sandboxed environment. Requires file and method UUIDs. Returns output, success, error, and optional benchmark data. CONSTRAINT: the sandbox blocks literal http://|https:// strings (exfiltration guard) — build any URL (success_url, redirects, webhooks) with the url('/path') helper, never a literal scheme string.`,
     inputSchema: {
@@ -1429,6 +1467,20 @@ Pass the uuids returned by search_code. EFFICIENCY: trust a high-fit search resu
         file: {
           type: 'string',
           description: 'UUID of the migration file to apply (its up() method runs against the tenant DB)',
+        },
+      },
+      required: ['file'],
+    },
+  },
+  {
+    name: 'run_tests',
+    description: `Run every test in a studio test file (type 'test') and return per-test results: pass/fail, failure message, location, duration. Use this to prove code you've built or reused actually works. Runs are wrapped in a database transaction and rolled back — tests never permanently mutate project data. AUTHORING CONSTRAINT: studio tests are named methods on the test file (e.g. "creates a plan"), asserting with expect() chains or $this->assert*() — Pest's top-level test()/it()/describe()/beforeEach() declarations do NOT work in the studio runtime and are rejected at validation.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          description: 'UUID of the test file to run (required)',
         },
       },
       required: ['file'],
@@ -1681,7 +1733,7 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 - Files are stored as json. The json has a data key that references its methods (using uuids), and each method has a data key that references statements, and each statement has a data key that references clauses.
 
 ## Tools
-- The reuse-first core is always loaded: \`create_resources\`, \`create_file\`, \`search_code\`/\`search_files\`/\`search_methods\`/\`search_routes\`, \`reuse_code\`, \`create_route\`/\`save_route\`, \`run_code\`, \`run_migration\`, \`get_assembled_code\`, \`get_project\`. A scaffold-or-reuse build needs nothing else.
+- The reuse-first core is always loaded: \`create_resources\`, \`create_file\`, \`search_code\`/\`search_files\`/\`search_methods\`/\`search_routes\`, \`reuse_code\`, \`create_route\`/\`save_route\`, \`run_code\`, \`run_migration\`, \`run_tests\`, \`get_assembled_code\`, \`get_project\`. A scaffold-or-reuse build needs nothing else.
 - Situational tools are kept out of the default set to save context; call \`load_tools\` ONCE with the group you need: **"editing"** — surgical statement-level edits + granular inspection (\`save_*\`, \`create_method\`, \`create_statement\`(\`_with_code\`), \`add_method_body\`, \`add_statement_code\`, \`replace_method_body\`, \`delete_*\`, \`get_file\`/\`get_method\`/\`get_statement\`/\`get_route\`); "frontend" (UI/Vue); "analysis" (audits); "capabilities" (libraries/packages); "settings". Load "editing" only when you must hand-edit existing code or inspect a specific unit.
 
 ## Fast path
@@ -1768,7 +1820,7 @@ const LAZY_GROUPS: Record<string, string[]> = {
   editing: [
     'save_file', 'save_method', 'save_statement', 'save_directory',
     'create_method', 'create_statement', 'create_statement_with_code', 'create_directory',
-    'add_method_body', 'add_statement_code', 'replace_method_body',
+    'add_method_body', 'add_statement_code', 'replace_method_body', 'rename_variable',
     'delete_file', 'delete_method', 'delete_statement', 'delete_route',
     'get_file', 'get_method', 'get_statement', 'get_route', 'get_directory',
   ],
@@ -1967,6 +2019,23 @@ async function handleCallTool(request: any) {
                 success: true,
                 message: 'Method body replaced in place (method UUID and wiring preserved)',
                 data: result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'rename_variable': {
+        const { method, ...params } = args as any;
+        const result = await stellify.renameVariable(method, params);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: result?.message ?? 'Variable renamed across the method',
+                data: result?.data ?? result,
               }, null, 2),
             },
           ],
@@ -2544,6 +2613,27 @@ async function handleCallTool(request: any) {
         };
       }
 
+      case 'list_forks': {
+        const result = await stellify.listForks((args as any).uuid);
+        const data = result.data || result;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: result.status ? result.status < 400 : true,
+                message: result.message,
+                canonical: data.canonical,
+                variants: data.variants,
+                next_step: (data.variants || []).length
+                  ? 'Present these variants (note + adoption) to the user; reuse the chosen one with reuse_code, or the canonical if none fit better.'
+                  : 'No curated variants — reuse the canonical unit.',
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
       case 'create_resources': {
         const result = await stellify.createResources(args as any);
         const data = result.data || result;
@@ -2634,6 +2724,28 @@ async function handleCallTool(request: any) {
                 success: result.status === 200 || result.success !== false,
                 message: result.message || 'Migration executed',
                 data: result.data ?? result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'run_tests': {
+        const result = await stellify.runTests((args as any).file);
+        // Backend envelope: { status, message, data: { total, passed, failed, tests[] }, errors }.
+        const suite = result.data ?? {};
+        const ok = (result.status === undefined || result.status === 200) && (suite.failed ?? 0) === 0;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: ok,
+                message: ok
+                  ? `${suite.passed ?? 0}/${suite.total ?? 0} tests passed`
+                  : `${suite.failed ?? '?'} of ${suite.total ?? '?'} tests failed`,
+                results: suite,
+                errors: result.errors,
               }, null, 2),
             },
           ],
