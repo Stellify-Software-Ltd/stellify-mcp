@@ -347,6 +347,13 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Bulk badge feed: which of these entities have curated fork alternatives. Returns a
+  // compact { uuid: count } map (non-zero only) — no fork data, just the counts.
+  async variantCounts(uuids: string[]) {
+    const response = await this.client.post('/reuse/variant-counts', { uuids });
+    return response.data;
+  }
+
   // Code execution - runs a specific method by file and method UUID
   async runCode(params: {
     file: string;

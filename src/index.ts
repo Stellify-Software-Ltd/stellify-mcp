@@ -1428,6 +1428,21 @@ Pass the uuids returned by search_code. EFFICIENCY: trust a high-fit search resu
     },
   },
   {
+    name: 'variant_counts',
+    description: `BULK check which of a set of units have curated fork alternatives — the cheap "badge" query. Pass the uuids you're working with (file/method) and get back a compact { uuid: count } map with only the non-zero entries. This is uuid→int, NO fork data — use it to decide which units are worth a list_forks call. References and local forks resolve to their canonical; a unit is excluded from its own count (a fork reports its siblings). Prefer this over calling list_forks blindly across many units.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'file/method uuids to check for available fork alternatives (max 500).',
+        },
+      },
+      required: ['uuids'],
+    },
+  },
+  {
     name: 'run_code',
     description: `Execute a method in sandboxed environment. Requires file and method UUIDs. Returns output, success, error, and optional benchmark data. CONSTRAINT: the sandbox blocks literal http://|https:// strings (exfiltration guard) — build any URL (success_url, redirects, webhooks) with the url('/path') helper, never a literal scheme string.`,
     inputSchema: {
@@ -2628,6 +2643,23 @@ async function handleCallTool(request: any) {
                 next_step: (data.variants || []).length
                   ? 'Present these variants (note + adoption) to the user; reuse the chosen one with reuse_code, or the canonical if none fit better.'
                   : 'No curated variants — reuse the canonical unit.',
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'variant_counts': {
+        const result = await stellify.variantCounts((args as any).uuids);
+        const data = result.data || result;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: result.status ? result.status < 400 : true,
+                message: result.message,
+                counts: data.counts,
               }, null, 2),
             },
           ],
