@@ -354,6 +354,13 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Offer a file/method you own into the shared library for curator review. Reference model:
+  // you keep ownership; on approval others can reference it and you earn when they do.
+  async submitCode(params: { type: 'file' | 'method'; uuid: string; note?: string }) {
+    const response = await this.client.post('/reuse/submit-fork', params);
+    return response.data;
+  }
+
   // Code execution - runs a specific method by file and method UUID
   async runCode(params: {
     file: string;

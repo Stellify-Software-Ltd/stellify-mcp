@@ -95,7 +95,7 @@ function getFrameworkAPI(moduleName?: string): any {
 const tools: Tool[] = [
   {
     name: 'load_tools',
-    description: `Enable a group of situational tools that are kept OUT of the default set to save context (they cost tokens on every turn). Call this ONCE with the group(s) you need and those tools become available to call. Groups: "editing" (surgical statement-level edits + granular inspection: save_/create_method/create_statement/add_/replace_method_body/delete_/get_file/get_method — load this ONLY when you must hand-edit existing code or inspect a specific unit; the scaffold + reuse path does not need it), "frontend" (UI elements, Vue components, realtime broadcast, publish), "analysis" (code quality / performance / attribute audits), "capabilities" (enable libraries & packages, framework API reference), "settings" (setting profiles). The reuse-first core — create_resources, create_file, search_code, reuse_code, create_route/save_route, run_code, run_migration, run_tests, get_assembled_code — is always loaded, so a normal scaffold/reuse build needs no load_tools call.`,
+    description: `Enable a group of situational tools that are kept OUT of the default set to save context (they cost tokens on every turn). Call this ONCE with the group(s) you need and those tools become available to call. Groups: "editing" (surgical statement-level edits + granular inspection: save_/create_method/create_statement/add_/replace_method_body/delete_/get_file/get_method — load this ONLY when you must hand-edit existing code or inspect a specific unit; the scaffold + reuse path does not need it), "frontend" (UI elements, Vue components, realtime broadcast, publish), "analysis" (code quality / performance / attribute audits), "capabilities" (enable libraries & packages, framework API reference), "settings" (setting profiles), "contribute" (submit_code — offer the user's OWN file/method into the shared library for reuse; load only when they ask to submit/share/offer their code). The reuse-first core — create_resources, create_file, search_code, reuse_code, create_route/save_route, run_code, run_migration, run_tests, get_assembled_code — is always loaded, so a normal scaffold/reuse build needs no load_tools call.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1443,6 +1443,29 @@ Pass the uuids returned by search_code. EFFICIENCY: trust a high-fit search resu
     },
   },
   {
+    name: 'submit_code',
+    description: `Offer a file or method the user OWNS into the shared reusable-code library for curator review. Use this when the user has built something reusable and wants to contribute it (e.g. "submit this", "share this with the library", "offer this for reuse"). REFERENCE MODEL: the user keeps ownership — approval makes the unit referenceable by other projects and the user earns when it is reused; it is never copied away from them. Submittable code must be in the user's own project (net-new or a fork; both are fine). A curator reviews and approves or rejects — submission does not publish immediately. Pass an optional note making the case for why this unit is useful to others (it is shown to the curator and, on approval, to developers browsing variants). Do NOT call this to reuse code — that is reuse_code; this is the contribute direction.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: {
+          type: 'string',
+          enum: ['file', 'method'],
+          description: 'Whether the unit being submitted is a file or a method.',
+        },
+        uuid: {
+          type: 'string',
+          description: 'UUID of the file or method to submit. Must belong to the active project (code the user owns).',
+        },
+        note: {
+          type: 'string',
+          description: "Optional note for the curator: the case for why this unit is useful to others. Shown at review, and to developers browsing variants on approval.",
+        },
+      },
+      required: ['type', 'uuid'],
+    },
+  },
+  {
     name: 'run_code',
     description: `Execute a method in sandboxed environment. Requires file and method UUIDs. Returns output, success, error, and optional benchmark data. CONSTRAINT: the sandbox blocks literal http://|https:// strings (exfiltration guard) — build any URL (success_url, redirects, webhooks) with the url('/path') helper, never a literal scheme string.`,
     inputSchema: {
@@ -1749,7 +1772,7 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 
 ## Tools
 - The reuse-first core is always loaded: \`create_resources\`, \`create_file\`, \`search_code\`/\`search_files\`/\`search_methods\`/\`search_routes\`, \`reuse_code\`, \`create_route\`/\`save_route\`, \`run_code\`, \`run_migration\`, \`run_tests\`, \`get_assembled_code\`, \`get_project\`. A scaffold-or-reuse build needs nothing else.
-- Situational tools are kept out of the default set to save context; call \`load_tools\` ONCE with the group you need: **"editing"** — surgical statement-level edits + granular inspection (\`save_*\`, \`create_method\`, \`create_statement\`(\`_with_code\`), \`add_method_body\`, \`add_statement_code\`, \`replace_method_body\`, \`delete_*\`, \`get_file\`/\`get_method\`/\`get_statement\`/\`get_route\`); "frontend" (UI/Vue); "analysis" (audits); "capabilities" (libraries/packages); "settings". Load "editing" only when you must hand-edit existing code or inspect a specific unit.
+- Situational tools are kept out of the default set to save context; call \`load_tools\` ONCE with the group you need: **"editing"** — surgical statement-level edits + granular inspection (\`save_*\`, \`create_method\`, \`create_statement\`(\`_with_code\`), \`add_method_body\`, \`add_statement_code\`, \`replace_method_body\`, \`delete_*\`, \`get_file\`/\`get_method\`/\`get_statement\`/\`get_route\`); "frontend" (UI/Vue); "analysis" (audits); "capabilities" (libraries/packages); "settings"; "contribute" (\`submit_code\` — offer the user's own code into the shared library). Load "editing" only when you must hand-edit existing code or inspect a specific unit; load "contribute" only when the user asks to submit/share their code.
 
 ## Fast path
 - **MANDATORY FIRST STEP — reuse before you build.** Before ANY \`create_resources\`/\`create_file\` for a new feature, you MUST call \`search_code\` first. This is NOT optional and applies *even when the feature is small, fully specified, or the project is empty* — "it's quick to just build it" is exactly the wrong instinct, because cloning an existing unit with \`reuse_code\` costs a fraction of regenerating it (that is the whole point of this platform). TRUST a high-fit match — do NOT \`get_file\`/\`get_method\` to double-check first — then \`reuse_code\` it (the canonical unit is REFERENCED into your project in place, not copied; adapt it afterwards with the ordinary editing tools — edits fork only what they touch, via copy-on-write). You may scaffold from scratch ONLY after \`search_code\` has returned nothing usable.
@@ -1843,6 +1866,10 @@ const LAZY_GROUPS: Record<string, string[]> = {
   analysis: ['analyze_attributes', 'search_attributes', 'analyze_performance', 'analyze_quality'],
   capabilities: ['list_capabilities', 'set_capability', 'request_capability', 'install_package', 'get_stellify_framework_api'],
   settings: ['save_setting', 'get_setting', 'delete_setting'],
+  // Contributing OWNED code into the shared library — a deliberate, occasional action, not part
+  // of any build turn, so it is deferred off the default payload. Load only when the user asks to
+  // submit/share/offer their code for reuse.
+  contribute: ['submit_code'],
 };
 const groupFor = (toolName: string): string | null => {
   for (const [group, names] of Object.entries(LAZY_GROUPS)) {
@@ -2660,6 +2687,27 @@ async function handleCallTool(request: any) {
                 success: result.status ? result.status < 400 : true,
                 message: result.message,
                 counts: data.counts,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'submit_code': {
+        const result = await stellify.submitCode(args as any);
+        const data = result.data || result;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: result.status ? result.status < 400 : true,
+                message: result.message,
+                submission_id: data.submission_id,
+                forked_from: data.forked_from,
+                next_step: (result.status ? result.status < 400 : true)
+                  ? 'Submitted for review — a curator will approve or reject. The user keeps ownership and earns if it is reused. Nothing to do now.'
+                  : 'Submission failed — surface the message to the user (only code they own, in the active project, can be submitted).',
               }, null, 2),
             },
           ],
