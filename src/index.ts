@@ -2376,6 +2376,22 @@ async function handleCallTool(request: any) {
 
       case 'html_to_elements': {
         const result = await stellify.htmlToElements(args as any);
+        // The endpoint reports quota/permission failures as a JSON status field
+        // on an HTTP 200 — surface them instead of reporting "0 elements".
+        if (result.status && result.status !== 200) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  success: false,
+                  status: result.status,
+                  error: result.message || 'html_to_elements failed',
+                }, null, 2),
+              },
+            ],
+          };
+        }
         const elementCount = Object.keys(result.data || {}).length;
         const testMode = (args as any).test ? ' (TEST MODE - not created)' : '';
         return {
