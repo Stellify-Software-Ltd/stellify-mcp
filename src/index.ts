@@ -158,8 +158,8 @@ Pass 'includes' array for framework class dependencies (auto-resolved to UUIDs).
         },
         type: {
           type: 'string',
-          enum: ['class', 'model', 'controller', 'middleware', 'js'],
-          description: 'Type of file: "js" for JavaScript/Vue, others for PHP',
+          enum: ['class', 'model', 'controller', 'middleware', 'js', 'test', 'migration'],
+          description: 'Type of file: "js" for JavaScript/Vue, others for PHP. Use "test" for studio test files (run with run_tests) and "migration" for hand-authored migrations (run with run_migration).',
         },
         extension: {
           type: 'string',
@@ -1044,8 +1044,8 @@ Required: uuid, name, type. For significant changes, include context fields: sum
         },
         type: {
           type: 'string',
-          enum: ['js', 'class', 'controller', 'model', 'middleware'],
-          description: 'File type: "js" for JavaScript/Vue, others for PHP',
+          enum: ['js', 'class', 'controller', 'model', 'middleware', 'test', 'migration'],
+          description: 'File type: "js" for JavaScript/Vue, others for PHP. Files must be type "test" for run_tests to accept them and type "migration" for run_migration to accept them.',
         },
         extension: {
           type: 'string',
