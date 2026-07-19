@@ -95,7 +95,7 @@ function getFrameworkAPI(moduleName?: string): any {
 const tools: Tool[] = [
   {
     name: 'load_tools',
-    description: `Enable a group of situational tools that are kept OUT of the default set to save context (they cost tokens on every turn). Call this ONCE with the group(s) you need and those tools become available to call. Groups: "editing" (surgical statement-level edits + granular inspection: save_/create_method/create_statement/add_/replace_method_body/delete_/get_file/get_method — load this ONLY when you must hand-edit existing code or inspect a specific unit; the scaffold + reuse path does not need it), "frontend" (UI elements, Vue components, realtime broadcast, publish), "analysis" (code quality / performance / attribute audits), "capabilities" (enable libraries & packages, framework API reference), "settings" (setting profiles), "contribute" (submit_code — offer the user's OWN file/method into the shared library for reuse; load only when they ask to submit/share/offer their code). The reuse-first core — create_resources, create_file, search_code, reuse_code, create_route/save_route, run_code, run_migration, run_tests, get_assembled_code — is always loaded, so a normal scaffold/reuse build needs no load_tools call.`,
+    description: `Enable a group of situational tools that are kept OUT of the default set to save context (they cost tokens on every turn). Call this ONCE with the group(s) you need and those tools become available to call. Groups: "editing" (surgical statement-level edits + granular inspection: save_/create_method/create_statement/add_/replace_method_body/delete_/get_file/get_method — load this ONLY when you must hand-edit existing code or inspect a specific unit; the scaffold + reuse path does not need it), "frontend" (UI elements, Vue components, realtime broadcast, publish), "analysis" (code quality / performance / attribute audits), "capabilities" (enable libraries & packages, framework API reference), "settings" (setting profiles + project lifecycle: create_project / set_active_project / save_project_meta / save_module), "contribute" (submit_code — offer the user's OWN file/method into the shared library for reuse; load only when they ask to submit/share/offer their code). The reuse-first core — create_resources, create_file, search_code, reuse_code, create_route/save_route, run_code, run_migration, run_tests, get_assembled_code — is always loaded, so a normal scaffold/reuse build needs no load_tools call.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1724,6 +1724,72 @@ IMPORTANT:
     },
   },
   {
+    name: 'save_project_meta',
+    description: `Set the ACTIVE project's App Store card metadata — its display name and description. These are what the Constellation store card renders, so set them whenever a project is built for (or headed to) the store. Owner-only. Does NOT publish the project (listing stays a manual review) and cannot touch is_public or card images.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Project display name (e.g., "Semantic Search"). Shown as the card title.',
+        },
+        description: {
+          type: 'string',
+          description: 'Card blurb shown under the title. One or two selling sentences.',
+        },
+      },
+    },
+  },
+  {
+    name: 'create_project',
+    description: `Create a fresh, empty project for the user and make it their ACTIVE project. Use when starting work that belongs in its own project (e.g. a new Constellation module) instead of building inside the currently open one. The current project is untouched — the active pointer is simply repointed. Owner-only and requires a paid plan (or a debug environment). Scaffolds the same starters as the UI: owner permission, app/database settings, a "/" homepage route and the routes directory.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Project display name (e.g., "Metrics Dashboard"). Defaults to "New project".',
+        },
+      },
+    },
+  },
+  {
+    name: 'set_active_project',
+    description: `Switch the user's ACTIVE project to another project they own or have been assigned to. All other tools operate on the active project, so use this to move between projects (e.g. back to a module project to rename or extend it). Fails with 403 for projects the user has no access to.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: 'UUID of the target project.',
+        },
+      },
+      required: ['uuid'],
+    },
+  },
+  {
+    name: 'save_module',
+    description: `Set a project module's name and/or description. Modules are the named groups files/routes are organised into (created via the 'module' param on create_file/create_route); the description documents what the module provides for anyone browsing or reusing it.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        module: {
+          type: 'string',
+          description: 'Module UUID or kebab-case name (e.g., "ai-chat").',
+        },
+        name: {
+          type: 'string',
+          description: 'New module name (kebab-cased server-side).',
+        },
+        description: {
+          type: 'string',
+          description: 'What this module provides.',
+        },
+      },
+      required: ['module'],
+    },
+  },
+  {
     name: 'delete_setting',
     description: `Delete a setting profile from the tenant's settings table.
 
@@ -1772,7 +1838,7 @@ const SERVER_INSTRUCTIONS = `Stellify is a coding platform where code is stored 
 
 ## Tools
 - The reuse-first core is always loaded: \`create_resources\`, \`create_file\`, \`search_code\`/\`search_files\`/\`search_methods\`/\`search_routes\`, \`reuse_code\`, \`create_route\`/\`save_route\`, \`run_code\`, \`run_migration\`, \`run_tests\`, \`get_assembled_code\`, \`get_project\`. A scaffold-or-reuse build needs nothing else.
-- Situational tools are kept out of the default set to save context; call \`load_tools\` ONCE with the group you need: **"editing"** — surgical statement-level edits + granular inspection (\`save_*\`, \`create_method\`, \`create_statement\`(\`_with_code\`), \`add_method_body\`, \`add_statement_code\`, \`replace_method_body\`, \`delete_*\`, \`get_file\`/\`get_method\`/\`get_statement\`/\`get_route\`); "frontend" (UI/Vue); "analysis" (audits); "capabilities" (libraries/packages); "settings"; "contribute" (\`submit_code\` — offer the user's own code into the shared library). Load "editing" only when you must hand-edit existing code or inspect a specific unit; load "contribute" only when the user asks to submit/share their code.
+- Situational tools are kept out of the default set to save context; call \`load_tools\` ONCE with the group you need: **"editing"** — surgical statement-level edits + granular inspection (\`save_*\`, \`create_method\`, \`create_statement\`(\`_with_code\`), \`add_method_body\`, \`add_statement_code\`, \`replace_method_body\`, \`delete_*\`, \`get_file\`/\`get_method\`/\`get_statement\`/\`get_route\`); "frontend" (UI/Vue); "analysis" (audits); "capabilities" (libraries/packages); "settings" (setting profiles + project lifecycle: \`create_project\`/\`set_active_project\`/\`save_project_meta\`/\`save_module\`); "contribute" (\`submit_code\` — offer the user's own code into the shared library). Load "editing" only when you must hand-edit existing code or inspect a specific unit; load "contribute" only when the user asks to submit/share their code.
 
 ## Fast path
 - **MANDATORY FIRST STEP — reuse before you build.** Before ANY \`create_resources\`/\`create_file\` for a new feature, you MUST call \`search_code\` first. This is NOT optional and applies *even when the feature is small, fully specified, or the project is empty* — "it's quick to just build it" is exactly the wrong instinct, because cloning an existing unit with \`reuse_code\` costs a fraction of regenerating it (that is the whole point of this platform). TRUST a high-fit match — do NOT \`get_file\`/\`get_method\` to double-check first — then \`reuse_code\` it (the canonical unit is REFERENCED into your project in place, not copied; adapt it afterwards with the ordinary editing tools — edits fork only what they touch, via copy-on-write). You may scaffold from scratch ONLY after \`search_code\` has returned nothing usable.
@@ -1865,7 +1931,7 @@ const LAZY_GROUPS: Record<string, string[]> = {
   frontend: ['html_to_elements', 'create_element', 'update_element', 'get_element', 'get_element_tree', 'delete_element', 'search_elements', 'broadcast_element_command', 'publish'],
   analysis: ['analyze_attributes', 'search_attributes', 'analyze_performance', 'analyze_quality'],
   capabilities: ['list_capabilities', 'set_capability', 'request_capability', 'install_package', 'get_stellify_framework_api'],
-  settings: ['save_setting', 'get_setting', 'delete_setting'],
+  settings: ['save_setting', 'get_setting', 'delete_setting', 'save_project_meta', 'save_module', 'create_project', 'set_active_project'],
   // Contributing OWNED code into the shared library — a deliberate, occasional action, not part
   // of any build turn, so it is deferred off the default payload. Load only when the user asks to
   // submit/share/offer their code for reuse.
@@ -3051,6 +3117,74 @@ async function handleCallTool(request: any) {
                 success: true,
                 message: `Saved setting "${name}" with ${Object.keys(data).length} key(s)`,
                 keys: Object.keys(data),
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'save_project_meta': {
+        const meta = args as { name?: string; description?: string };
+        const result = await stellify.saveProjectMeta(meta);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: 'Project metadata saved',
+                project: result.data ?? result,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'create_project': {
+        const { name } = args as { name?: string };
+        const result = await stellify.createProject({ name });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: result.status === 200,
+                message: result.message,
+                project: result.data ?? null,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'set_active_project': {
+        const { uuid } = args as { uuid: string };
+        const result = await stellify.setActiveProject(uuid);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: result.status === 200,
+                message: result.message,
+                project: result.data ?? null,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'save_module': {
+        const { module, name, description } = args as { module: string; name?: string; description?: string };
+        const result = await stellify.saveModule(module, { name, description });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                message: `Module "${module}" updated`,
+                module: result.data ?? result,
               }, null, 2),
             },
           ],

@@ -506,6 +506,33 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Project App Store card metadata (name/description) - the columns the
+  // Constellation card renders. Owner-only server-side.
+  async saveProjectMeta(meta: { name?: string; description?: string }) {
+    const response = await this.client.put('/project-meta', meta);
+    return response.data;
+  }
+
+  // Project module metadata - module identified by uuid or kebab-case name.
+  async saveModule(module: string, meta: { name?: string; description?: string }) {
+    const response = await this.client.put(`/project-modules/${module}`, meta);
+    return response.data;
+  }
+
+  // Project lifecycle - create a fresh project (becomes the active one).
+  // Owner-super + paid plan gated server-side.
+  async createProject(params: { name?: string }) {
+    const response = await this.client.post('/projects', params);
+    return response.data;
+  }
+
+  // Repoint the active-project pointer (users.project_id) to another
+  // owned/assigned project. Access checked server-side.
+  async setActiveProject(uuid: string) {
+    const response = await this.client.put('/active-project', { uuid });
+    return response.data;
+  }
+
   // Code Assembly - get rendered source code for a file
   async getAssembledCode(uuid: string) {
     const response = await this.client.get(`/file/${uuid}/source`);
