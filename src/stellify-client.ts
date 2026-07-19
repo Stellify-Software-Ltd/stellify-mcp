@@ -361,6 +361,21 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Browse the shared library: `popular` units ranked by live adoption (proven code to build
+  // on) and `in_demand` capability gaps others searched for and didn't find (what's worth
+  // contributing). Discovery, as opposed to search_code's targeted retrieval.
+  async browseLibrary(params: { limit?: number } = {}) {
+    const response = await this.client.get('/reuse/library', { params });
+    return response.data;
+  }
+
+  // The caller's contribution snapshot: how many times (and by how many distinct projects)
+  // their shared code has been reused, plus credits pending vs granted.
+  async getContributions() {
+    const response = await this.client.get('/reuse/contributions');
+    return response.data;
+  }
+
   // Code execution - runs a specific method by file and method UUID
   async runCode(params: {
     file: string;
