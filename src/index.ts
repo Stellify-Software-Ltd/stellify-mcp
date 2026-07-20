@@ -95,7 +95,7 @@ function getFrameworkAPI(moduleName?: string): any {
 const tools: Tool[] = [
   {
     name: 'load_tools',
-    description: `Enable a group of situational tools that are kept OUT of the default set to save context (they cost tokens on every turn). Call this ONCE with the group(s) you need and those tools become available to call. Groups: "editing" (surgical statement-level edits + granular inspection: save_/create_method/create_statement/add_/replace_method_body/delete_/get_file/get_method — load this ONLY when you must hand-edit existing code or inspect a specific unit; the scaffold + reuse path does not need it), "frontend" (UI elements, Vue components, realtime broadcast, publish), "analysis" (code quality / performance / attribute audits), "capabilities" (enable libraries & packages, framework API reference), "settings" (setting profiles + project lifecycle: create_project / set_active_project / save_project_meta / save_module), "contribute" (submit_code — offer the user's OWN file/method into the shared library for reuse; load only when they ask to submit/share/offer their code), "library" (browse_library — explore what's popular & what's in demand to build; get_contributions — the user's own reuse/earnings stats; load when they're exploring the library rather than building a specific feature). The reuse-first core — create_resources, create_file, search_code, reuse_code, create_route/save_route, run_code, run_migration, run_tests, get_assembled_code — is always loaded, so a normal scaffold/reuse build needs no load_tools call.`,
+    description: `Enable a group of situational tools that are kept OUT of the default set to save context (they cost tokens on every turn). Call this ONCE with the group(s) you need and those tools become available to call. Groups: "editing" (surgical statement-level edits + granular inspection: save_/create_method/create_statement/add_/replace_method_body/delete_/get_file/get_method — load this ONLY when you must hand-edit existing code or inspect a specific unit; the scaffold + reuse path does not need it), "frontend" (UI elements, Vue components, realtime broadcast, publish), "analysis" (code quality / performance / attribute audits), "capabilities" (enable libraries & packages, framework API reference), "settings" (setting profiles + project lifecycle: create_project / set_active_project / save_project_meta / save_module), "contribute" (submit_code — offer the user's OWN file/method into the shared library for reuse; get_contributions — the user's own reuse/earnings stats; load when they ask to submit/share their code or how their contributions are doing). The reuse-first core — create_resources, create_file, search_code, reuse_code, create_route/save_route, run_code, run_migration, run_tests, get_assembled_code — is always loaded, so a normal scaffold/reuse build needs no load_tools call.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1443,21 +1443,8 @@ Pass the uuids returned by search_code. EFFICIENCY: trust a high-fit search resu
     },
   },
   {
-    name: 'browse_library',
-    description: `BROWSE the shared reusable-code library — discovery, as opposed to search_code's targeted retrieval. Use this when the user is exploring rather than asking for a specific unit: "what can I reuse?", "what's popular?", or especially "what should I build?". Returns two feeds: 'popular' — proven units ranked by live adoption (uuid, capability summary, facets, and reused_by_projects = how many projects already build on it), reference any with reuse_code exactly like a search_code hit; and 'in_demand' — the Most Wanted board: prose capability gaps developers searched for and DIDN'T find (query + projects_wanting). The in_demand feed is the high-signal one: when a user is deciding what to make, surface these gaps — building and sharing one meets real, measured demand and earns when others reuse it. Read-only; never returns code. Optional 'limit' (default 20, max 50) caps each feed.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        limit: {
-          type: 'number',
-          description: 'Max items per feed (1–50, default 20).',
-        },
-      },
-    },
-  },
-  {
     name: 'get_contributions',
-    description: `Report the user's OWN contribution stats — how their shared code is being reused across the library. Use when they ask "has my code been reused?", "what have I earned?", or "how are my contributions doing?". Returns { total_reuses (times a stranger's project referenced your units), projects (distinct projects doing so), credits_pending (recorded, awaiting the retention window), credits_granted (settled) }. Scoped to the caller — never another user. Read-only, no input. Pair with submit_code (the contribute direction) and browse_library's in_demand feed (what to build next).`,
+    description: `Report the user's OWN contribution stats — how their shared code is being reused across the library. Use when they ask "has my code been reused?", "what have I earned?", or "how are my contributions doing?". Returns { total_reuses (times a stranger's project referenced your units), projects (distinct projects doing so), credits_pending (recorded, awaiting the retention window), credits_granted (settled) }. Scoped to the caller — never another user. Read-only, no input. Pair with submit_code (the contribute direction).`,
     inputSchema: {
       type: 'object',
       properties: {},
@@ -1953,13 +1940,11 @@ const LAZY_GROUPS: Record<string, string[]> = {
   analysis: ['analyze_attributes', 'search_attributes', 'analyze_performance', 'analyze_quality'],
   capabilities: ['list_capabilities', 'set_capability', 'request_capability', 'install_package', 'get_stellify_framework_api'],
   settings: ['save_setting', 'get_setting', 'delete_setting', 'save_project_meta', 'save_module', 'create_project', 'set_active_project'],
-  // Contributing OWNED code into the shared library — a deliberate, occasional action, not part
-  // of any build turn, so it is deferred off the default payload. Load only when the user asks to
-  // submit/share/offer their code for reuse.
-  contribute: ['submit_code'],
-  // Exploring the shared library rather than building — discovery ("what's popular / what should
-  // I build") and the user's own contribution stats. Not part of a build turn, so deferred.
-  library: ['browse_library', 'get_contributions'],
+  // The user's relationship with the shared library — submitting their OWN code and checking how
+  // their shared code is doing. Deliberate, occasional actions, not part of any build turn, so
+  // deferred off the default payload. Load when the user asks to submit/share code or how their
+  // contributions are doing.
+  contribute: ['submit_code', 'get_contributions'],
 };
 const groupFor = (toolName: string): string | null => {
   for (const [group, names] of Object.entries(LAZY_GROUPS)) {
@@ -2010,7 +1995,7 @@ async function handleCallTool(request: any) {
                 now_available: nowAvailable,
                 message: enabled.length > 0
                   ? `Enabled ${enabled.join(', ')}. Now available: ${nowAvailable.join(', ')}.`
-                  : 'No known groups matched. Valid groups: editing, frontend, analysis, capabilities, settings, contribute, library.',
+                  : 'No known groups matched. Valid groups: editing, frontend, analysis, capabilities, settings, contribute.',
               }, null, 2),
             },
           ],
@@ -2793,28 +2778,6 @@ async function handleCallTool(request: any) {
                 success: result.status ? result.status < 400 : true,
                 message: result.message,
                 counts: data.counts,
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'browse_library': {
-        const result = await stellify.browseLibrary(args as any);
-        const data = result.data || result;
-        const popular = data.popular || [];
-        const inDemand = data.in_demand || [];
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                success: result.status ? result.status < 400 : true,
-                popular,
-                in_demand: inDemand,
-                next_step: popular.length
-                  ? 'Reference any popular unit with reuse_code(files:[uuid]). To meet real demand, pick an in_demand gap, build it, and submit_code it.'
-                  : 'Library is sparse. Use search_code for targeted retrieval, or build and submit_code to seed it.',
               }, null, 2),
             },
           ],
