@@ -4,7 +4,7 @@
   "display_name": "Stellify MCP",
   "version": "0.1.3",
   "description": "Build Laravel and Vue.js apps through conversation with AI-native structured code editing",
-  "long_description": "Stellify MCP bridges Claude with Stellify - an AI-native code generation platform. Unlike traditional file-based code, Stellify stores code as structured JSON in a database, enabling:\n\n- **Surgical, statement-level edits** - AI can modify specific code statements without risk of breaking surrounding code\n- **Queryable code** - Find all methods using a specific class, trace dependencies instantly\n- **35 specialized tools** for project management, file/method creation, Vue component building, UI elements, and a reusable code library\n- **Incremental development workflow** - Build applications step-by-step with full type safety\n\nSupports Laravel/PHP (controllers, models, middleware) and Vue.js (reactive components, event handlers, templates).",
+  "long_description": "Stellify MCP bridges Claude with Stellify - an AI-native code generation platform. Unlike traditional file-based code, Stellify stores code as structured JSON in a database, enabling:\n\n- **Surgical, statement-level edits** - AI can modify specific code statements without risk of breaking surrounding code\n- **Queryable code** - Find all methods using a specific class, trace dependencies instantly\n- **37 specialized tools** for project management, file/method creation, Vue component building, UI elements, and a reusable code library\n- **Incremental development workflow** - Build applications step-by-step with full type safety\n\nSupports Laravel/PHP (controllers, models, middleware) and Vue.js (reactive components, event handlers, templates).",
   "author": {
     "name": "Stellisoft",
     "email": "stellifysoftware@gmail.com",
@@ -66,7 +66,9 @@
     {"name": "install_module", "description": "Install entire module into project"},
     {"name": "broadcast_element_command", "description": "Broadcast real-time UI updates via WebSocket"},
     {"name": "run_code", "description": "Execute code and return output with optional benchmarking"},
-    {"name": "get_contributions", "description": "The user's own reuse and earnings stats"}
+    {"name": "get_contributions", "description": "The user's own reuse and earnings stats"},
+    {"name": "see_divergences", "description": "See peers' reasoned changes to the referenced code you use"},
+    {"name": "explain_divergence", "description": "Explain why you changed a referenced unit, for other projects on it"}
   ],
   "tools_generated": false,
   "compatibility": {

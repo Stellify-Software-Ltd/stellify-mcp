@@ -368,6 +368,20 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Reasoned divergences other projects made from the canonical units this project references
+  // ("someone on this code changed it, here's why"). Explained-only; never the caller's own.
+  async seeDivergences() {
+    const response = await this.client.get('/reuse/divergences');
+    return response.data;
+  }
+
+  // Attach the "why" to a divergence the active project just made (copy-on-write fork of a
+  // referenced unit), so other projects on the same unit can see the reasoning.
+  async explainDivergence(params: { fork_uuid: string; reason: string }) {
+    const response = await this.client.post('/reuse/divergences/explain', params);
+    return response.data;
+  }
+
   // Code execution - runs a specific method by file and method UUID
   async runCode(params: {
     file: string;
