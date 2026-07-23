@@ -382,6 +382,13 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Adopt a peer's divergence: re-point this project's reference from the canonical unit to the
+  // peer's forked version (the diverger earns on adoption).
+  async adoptDivergence(params: { fork_uuid: string }) {
+    const response = await this.client.post('/reuse/divergences/adopt', params);
+    return response.data;
+  }
+
   // Code execution - runs a specific method by file and method UUID
   async runCode(params: {
     file: string;

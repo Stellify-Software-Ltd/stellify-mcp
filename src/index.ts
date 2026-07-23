@@ -95,7 +95,7 @@ function getFrameworkAPI(moduleName?: string): any {
 const tools: Tool[] = [
   {
     name: 'load_tools',
-    description: `Enable a group of situational tools that are kept OUT of the default set to save context (they cost tokens on every turn). Call this ONCE with the group(s) you need and those tools become available to call. Groups: "editing" (surgical statement-level edits + granular inspection: save_/create_method/create_statement/add_/replace_method_body/delete_/get_file/get_method — load this ONLY when you must hand-edit existing code or inspect a specific unit; the scaffold + reuse path does not need it), "frontend" (UI elements, Vue components, realtime broadcast, publish), "analysis" (code quality / performance / attribute audits), "capabilities" (enable libraries & packages, framework API reference), "settings" (setting profiles + project lifecycle: create_project / set_active_project / save_project_meta / save_module), "contribute" (submit_code — offer the user's OWN file/method into the shared library for reuse; get_contributions — the user's own reuse/earnings stats; see_divergences / explain_divergence — see how peers changed the referenced code you use, and explain your own changes to it; load when they ask to submit/share their code, how their contributions are doing, or how referenced code has been changed). The reuse-first core — create_resources, create_file, search_code, reuse_code, create_route/save_route, run_code, run_migration, run_tests, get_assembled_code — is always loaded, so a normal scaffold/reuse build needs no load_tools call.`,
+    description: `Enable a group of situational tools that are kept OUT of the default set to save context (they cost tokens on every turn). Call this ONCE with the group(s) you need and those tools become available to call. Groups: "editing" (surgical statement-level edits + granular inspection: save_/create_method/create_statement/add_/replace_method_body/delete_/get_file/get_method — load this ONLY when you must hand-edit existing code or inspect a specific unit; the scaffold + reuse path does not need it), "frontend" (UI elements, Vue components, realtime broadcast, publish), "analysis" (code quality / performance / attribute audits), "capabilities" (enable libraries & packages, framework API reference), "settings" (setting profiles + project lifecycle: create_project / set_active_project / save_project_meta / save_module), "contribute" (submit_code — offer the user's OWN file/method into the shared library for reuse; get_contributions — the user's own reuse/earnings stats; see_divergences / explain_divergence / adopt_divergence — see how peers changed the referenced code you use, explain your own changes, and adopt a peer's change; load when they ask to submit/share their code, how their contributions are doing, or how referenced code has been changed). The reuse-first core — create_resources, create_file, search_code, reuse_code, create_route/save_route, run_code, run_migration, run_tests, get_assembled_code — is always loaded, so a normal scaffold/reuse build needs no load_tools call.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1477,6 +1477,20 @@ Pass the uuids returned by search_code. EFFICIENCY: trust a high-fit search resu
     },
   },
   {
+    name: 'adopt_divergence',
+    description: `Adopt a peer's divergence — take their change to a unit you reference. Re-points your project's reference from the canonical unit to the peer's forked version, a granular swap that leaves the rest of the file untouched; the diverger earns on adoption. Use after see_divergences when a peer's reasoned change is one you want too. Pass fork_uuid from the see_divergences feed. Only works if your project actually references the unit that was diverged from. This tracks the peer's version — to instead make your OWN change, just edit the referenced unit (copy-on-write forks your private copy).`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fork_uuid: {
+          type: 'string',
+          description: 'UUID of the peer divergence to adopt, from the see_divergences feed.',
+        },
+      },
+      required: ['fork_uuid'],
+    },
+  },
+  {
     name: 'submit_code',
     description: `Offer a file or method the user OWNS into the shared reusable-code library for curator review. Use this when the user has built something reusable and wants to contribute it (e.g. "submit this", "share this with the library", "offer this for reuse"). REFERENCE MODEL: the user keeps ownership — approval makes the unit referenceable by other projects and the user earns when it is reused; it is never copied away from them. Submittable code must be in the user's own project (net-new or a fork; both are fine). A curator reviews and approves or rejects — submission does not publish immediately. Pass an optional note making the case for why this unit is useful to others (it is shown to the curator and, on approval, to developers browsing variants). Do NOT call this to reuse code — that is reuse_code; this is the contribute direction.`,
     inputSchema: {
@@ -1970,7 +1984,7 @@ const LAZY_GROUPS: Record<string, string[]> = {
   // their shared code is doing. Deliberate, occasional actions, not part of any build turn, so
   // deferred off the default payload. Load when the user asks to submit/share code or how their
   // contributions are doing.
-  contribute: ['submit_code', 'get_contributions', 'see_divergences', 'explain_divergence'],
+  contribute: ['submit_code', 'get_contributions', 'see_divergences', 'explain_divergence', 'adopt_divergence'],
 };
 const groupFor = (toolName: string): string | null => {
   for (const [group, names] of Object.entries(LAZY_GROUPS)) {
@@ -2860,6 +2874,23 @@ async function handleCallTool(request: any) {
                 success: result.status ? result.status < 400 : true,
                 message: result.message,
                 fork_uuid: data.fork_uuid,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'adopt_divergence': {
+        const result = await stellify.adoptDivergence(args as any);
+        const data = result.data || result;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: result.status ? result.status < 400 : true,
+                message: result.message,
+                reference: data.reference,
               }, null, 2),
             },
           ],
