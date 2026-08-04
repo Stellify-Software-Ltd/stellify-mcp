@@ -1146,14 +1146,14 @@ WARNING: This is destructive and cannot be undone. Make sure the file is not ref
       properties: {
         directory: {
           type: 'string',
-          description: 'UUID of the directory containing the file (get from get_project directories array or get_file response)',
+          description: 'Optional. The platform removes the file from whichever directory lists it, so this is only kept for backwards compatibility.',
         },
         uuid: {
           type: 'string',
           description: 'UUID of the file to delete',
         },
       },
-      required: ['directory', 'uuid'],
+      required: ['uuid'],
     },
   },
   {
@@ -2660,8 +2660,11 @@ async function handleCallTool(request: any) {
       }
 
       case 'delete_file': {
-        const { directory, uuid } = args as { directory: string; uuid: string };
-        const result = await stellify.deleteFile(directory, uuid);
+        const { directory, uuid } = args as { directory?: string; uuid: string };
+        // The directory path segment is advisory server-side; 'any' keeps the
+        // URL well-formed when the caller omits it (previously a missing arg
+        // interpolated as the literal string "undefined" and 500'd on Postgres).
+        const result = await stellify.deleteFile(directory || 'any', uuid);
         return {
           content: [
             {
