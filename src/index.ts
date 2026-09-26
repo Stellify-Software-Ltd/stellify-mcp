@@ -1975,7 +1975,7 @@ function recordTelemetry(entry: Record<string, unknown>): void {
 const server = new Server(
   {
     name: 'stellify-mcp',
-    version: '1.0.1',
+    version: '1.0.7',
   },
   {
     capabilities: {
