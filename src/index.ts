@@ -566,8 +566,8 @@ Route params like {id} auto-inject into controller method parameters when names 
         },
         method: {
           type: 'string',
-          enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-          description: 'HTTP method',
+          enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'ANY', 'MATCH', 'FALLBACK', 'REDIRECT', 'PERMANENT_REDIRECT'],
+          description: 'HTTP method. Use ANY for all methods, MATCH for custom combinations, FALLBACK for 404, REDIRECT/PERMANENT_REDIRECT for redirects.',
           default: 'GET',
         },
         type: {
@@ -618,13 +618,37 @@ Use this to look up a route you created or to find existing routes in the projec
   },
   {
     name: 'save_route',
-    description: `Update a route/page. Wire to controller with both controller and controller_method UUIDs. For significant routes, include context fields.`,
+    description: `Update a route/page. Wire to controller with both controller and controller_method UUIDs. For significant routes, include context fields. Set meta_title/meta_description (and optional og_* / meta_keywords) to give a public/shared page its own <title> and link-preview text instead of the generic site defaults.`,
     inputSchema: {
       type: 'object',
       properties: {
         uuid: {
           type: 'string',
           description: 'UUID of the route to update',
+        },
+        meta_title: {
+          type: 'string',
+          description: 'Page <title> and default og/twitter title. Use for shared/public pages so links preview as this page, not the generic site.',
+        },
+        meta_description: {
+          type: 'string',
+          description: 'Meta description and default og/twitter description shown in link previews.',
+        },
+        meta_keywords: {
+          type: 'string',
+          description: 'Optional meta keywords.',
+        },
+        og_title: {
+          type: 'string',
+          description: 'Open Graph / Twitter title override (defaults to meta_title).',
+        },
+        og_description: {
+          type: 'string',
+          description: 'Open Graph / Twitter description override (defaults to meta_description).',
+        },
+        og_image: {
+          type: 'string',
+          description: 'Absolute URL of the Open Graph / Twitter preview image.',
         },
         controller: {
           type: 'string',
@@ -648,7 +672,8 @@ Use this to look up a route you created or to find existing routes in the projec
         },
         method: {
           type: 'string',
-          enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+          enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'ANY', 'MATCH', 'FALLBACK', 'REDIRECT', 'PERMANENT_REDIRECT'],
+          description: 'HTTP method. Use ANY for all methods, MATCH for custom combinations, FALLBACK for 404, REDIRECT/PERMANENT_REDIRECT for redirects.',
         },
         middleware: {
           type: 'array',
