@@ -7,6 +7,12 @@
     "source": "github"
   },
   "version": "1.0.7",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.stellisoft.com/mcp"
+    }
+  ],
   "packages": [
     {
       "registryType": "npm",
@@ -22,7 +28,7 @@
           "format": "string",
           "isSecret": false,
           "name": "STELLIFY_API_URL",
-          "defaultValue": "https://api.stellisoft.com/v1"
+          "defaultValue": "https://api.stellisoft.com/api/v1"
         },
         {
           "description": "Your Stellify API token (get from stellisoft.com/settings/tokens)",
