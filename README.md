@@ -18,7 +18,51 @@ This MCP server lets AI assistants (like Claude Desktop) interact with your Stel
 - Install reusable code from the global library
 - Build applications through natural conversation
 
-## Quick Start
+## Quick Start — Hosted Server (recommended)
+
+The easiest way to connect is the hosted server at `https://api.stellisoft.com/mcp`. No install, no Node.js, no API token — your MCP client opens a browser window where you sign in with your Stellify account and approve access (OAuth).
+
+**Claude (web or desktop):** Stellify is listed in the Claude connectors directory — go to **Settings → Connectors**, find Stellify, and click Connect. Or choose **Add custom connector** and paste `https://api.stellisoft.com/mcp`.
+
+**Claude Code:**
+
+```bash
+claude mcp add --transport http stellify https://api.stellisoft.com/mcp
+```
+
+**Cursor** (`.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "stellify": { "url": "https://api.stellisoft.com/mcp" }
+  }
+}
+```
+
+**VS Code** (`.vscode/mcp.json`):
+
+```json
+{
+  "servers": {
+    "stellify": { "type": "http", "url": "https://api.stellisoft.com/mcp" }
+  }
+}
+```
+
+**Windsurf** (`~/.codeium/windsurf/mcp_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "stellify": { "serverUrl": "https://api.stellisoft.com/mcp" }
+  }
+}
+```
+
+## Local Install (npm alternative)
+
+Prefer to run the server locally? The npm package speaks the same protocol against the same platform API, authenticated with an API token instead of OAuth.
 
 ### Prerequisites
 
@@ -57,7 +101,7 @@ npm install -g @stellisoft/stellify-mcp
        "stellify": {
          "command": "stellify-mcp",
          "env": {
-           "STELLIFY_API_URL": "https://api.stellisoft.com/v1",
+           "STELLIFY_API_URL": "https://stellisoft.com/api/v1",
            "STELLIFY_API_TOKEN": "your-token-here"
          }
        }
