@@ -1,6 +1,7 @@
 # Stellify MCP Server
 
 [![npm version](https://badge.fury.io/js/@stellisoft%2Fstellify-mcp.svg)](https://www.npmjs.com/package/@stellisoft/stellify-mcp)
+[![smithery badge](https://smithery.ai/badge/stellisoft/stellify)](https://smithery.ai/servers/stellisoft/stellify)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Model Context Protocol (MCP) server for [Stellify](https://stellisoft.com) - the AI-native code generation platform.
