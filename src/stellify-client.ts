@@ -594,4 +594,24 @@ export class StellifyClient {
     return response.data;
   }
 
+  // Full standalone-Laravel export of the active project (the shared export
+  // artifact). format 'files' inlines contents; 'zip' returns a signed URL.
+  async exportProject(params: { format?: 'files' | 'zip' } = {}) {
+    const response = await this.client.get('/export/project', { params });
+    return response.data;
+  }
+
+  // SKELETON: module manifest — typed settings, dependencies, descriptions.
+  async getModuleManifest(module: string) {
+    const response = await this.client.get(`/module-manifest/${module}`);
+    return response.data;
+  }
+
+  // SKELETON: deterministic resolver — validate a structured settings request,
+  // resolve dependencies, assemble the module (or explain exactly what's wrong).
+  async applyModuleSettings(module: string, settings: Record<string, any>) {
+    const response = await this.client.post(`/module-settings/${module}`, { settings });
+    return response.data;
+  }
+
 }

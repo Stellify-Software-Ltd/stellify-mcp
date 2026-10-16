@@ -1900,6 +1900,54 @@ HARD RULE: do NOT call this during a build. Call it AT MOST ONCE, at the very en
       required: ['uuid'],
     },
   },
+  {
+    name: 'export_project',
+    description: `Export the active project as a complete, standalone Laravel application — the same artifact GitHub sync pushes. Returns the full file list (composer.json, config/, routes/, app/, migrations, tests, .env.example) assembled from the project's code, settings and capabilities.
+
+format 'files' (default) inlines every file's contents in the response; 'zip' returns a signed download URL (1-hour expiry) instead.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        format: {
+          type: 'string',
+          enum: ['files', 'zip'],
+          description: "Response shape: 'files' inlines contents, 'zip' returns a signed download URL.",
+        },
+      },
+    },
+  },
+  {
+    name: 'get_module_manifest',
+    description: `SKELETON EXPERIMENT: fetch a module's manifest — every configurable setting with its type, default, allowed values, constraints, plain-English description, dependencies and price. Use it to map user requirements onto settings before calling apply_module_settings. Requirements that map to no setting should be flagged back to the user, not guessed. Currently available: 'auth'.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        module: {
+          type: 'string',
+          description: "Module name (e.g. 'auth').",
+        },
+      },
+      required: ['module'],
+    },
+  },
+  {
+    name: 'apply_module_settings',
+    description: `SKELETON EXPERIMENT: apply a structured settings request ({setting: value}) for a module. A deterministic server-side resolver validates every value against the manifest, checks dependencies (e.g. mail must be configured before email verification), and then assembles the module into the active project — referencing proven units, wiring routes with the right middleware, and writing settings. On any problem it applies NOTHING and returns precise, actionable errors. Partial requests are deltas over the previously applied state, so a change request is just the changed keys.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        module: {
+          type: 'string',
+          description: "Module name (e.g. 'auth').",
+        },
+        settings: {
+          type: 'object',
+          description: 'Setting name → value map, e.g. {"registration": true, "login_throttle": 5, "timezone": "Europe/London"}.',
+        },
+      },
+      required: ['module', 'settings'],
+    },
+  },
 ];
 
 // Server instructions for tool discovery (used by MCP Tool Search)
@@ -3366,6 +3414,45 @@ async function handleCallTool(request: any) {
             {
               type: 'text',
               text: `// ${fileName}\n\n${code}`,
+            },
+          ],
+        };
+      }
+
+      case 'export_project': {
+        const { format } = args as { format?: 'files' | 'zip' };
+        const result = await stellify.exportProject({ format });
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_module_manifest': {
+        const { module } = args as { module: string };
+        const result = await stellify.getModuleManifest(module);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'apply_module_settings': {
+        const { module, settings } = args as { module: string; settings: Record<string, any> };
+        const result = await stellify.applyModuleSettings(module, settings);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
             },
           ],
         };
