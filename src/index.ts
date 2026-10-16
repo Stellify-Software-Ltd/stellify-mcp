@@ -1904,7 +1904,10 @@ HARD RULE: do NOT call this during a build. Call it AT MOST ONCE, at the very en
     name: 'export_project',
     description: `Export the active project as a complete, standalone Laravel application — the same artifact GitHub sync pushes. Returns the full file list (composer.json, config/, routes/, app/, migrations, tests, .env.example) assembled from the project's code, settings and capabilities.
 
-format 'files' (default) inlines every file's contents in the response; 'zip' returns a signed download URL (1-hour expiry) instead.`,
+RESPONSE SHAPE (identical on every export surface — the artifact payload always lives under "data"):
+{"status": 200, "data": {"format": "files"|"zip", "file_count": n, "files": [{"path", "content"}, ...], "download_url": string, "expires_in_minutes": 60}}
+
+format 'files' (default) fills data.files; 'zip' fills data.download_url (signed, 1-hour expiry) instead.`,
     inputSchema: {
       type: 'object',
       properties: {
